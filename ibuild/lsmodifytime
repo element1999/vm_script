@@ -1,0 +1,1 @@
+stat  $1 | grep -i Modify | awk -F. '{print $1}' | awk '{print $2$3}'| awk -F- '{print $1$2$3}' | awk -F: '{print $1$2$4i,$5,$6}'

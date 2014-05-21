@@ -1,0 +1,527 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+   - $Id: Process.xml,v 1.8 2011/05/05 17:34:58 achau Exp $
+   -
+   - Copyright (c) 2013 Ericsson AB.
+   - All rights reserved.
+-->
+<!--
+    The following settings will be set by a script and configured at
+    install time:
+    ${ccc.home} - Base directory of CCC installaton (/opt/CCC?)
+    ${ns.addr} - IP address of the CCC primary naming service
+    ${ns.port} - Port number of the CCC primary naming service
+    ${db.addr} - IP address of the CCC RDBMS
+    ${db.port} - Port number of the CCC RDBMS
+    N.B. These can be overridden by parameters passed on the RMI
+         interface.
+
+    The following settings are inherited from the CCC Process Manager
+    ${java.class.path} - Classpath inherited from the CCC Process Manager
+
+    Additional settings are determined for process classes at runtime and
+    passed as parameters.  These are described in comments within each
+    process's section of this file.
+-->
+<process-config>
+    <process-class name="nameservice" level="1">
+        <!--
+            Only one Name Service process is permitted per CCC.  This must
+            not be started or stopped using the PM RMI interface except when
+            dealing with failure conditions.
+        -->
+        <main-class name="org.jacorb.naming.NameServer"/>
+        <jvm-type value="server"/>
+        <auto-restart/>
+        <run-at-start tier="master" type="single"/>
+        <jvm-args>
+            <arg value="-Xmx256m"/>
+            <!-- Uncomment to connect via Eclipse remote debugger:
+            <arg value="${jvmargs.debug.arg1}" />
+            <arg value="${jvmargs.debug.arg2}" />
+            <arg value="${jvmargs.debug.arg3}" />
+            <arg value="${jvmargs.debug.nameservice}" />
+            -->
+        </jvm-args>
+        <classpath>
+            <path value="${java.class.path}"/>
+            <path value="${ccc.install}/ext/jacorb.jar"/>
+            <path value="${ccc.install}/ext/antlr-2.7.2.jar"/>
+            <path value="${ccc.install}/ext/logkit-1.2.jar"/>
+            <path value="${ccc.install}/ext/avalon-framework-4.1.5.jar"/>
+            <path value="${ccc.install}/ext/concurrent-1.3.2.jar"/>
+       </classpath>
+        <jvm-properties>
+            <property name="log.file" value="${ccc.log.dir}/soesa_nameservice.log"/>
+            <property name="custom.props" value="${ccc.home}/data/soesa_ns.jacorb.properties"/>
+            <property name="org.omg.CORBA.ORBClass" value="org.jacorb.orb.ORB"/>
+            <property name="org.omg.CORBA.ORBSingletonClass" value="org.jacorb.orb.ORBSingleton"/>
+            <property name="OAAddress" value="iiop:://${ns.addr}:${ns.port}"/>
+        </jvm-properties>
+        <identifying-properties/>
+    </process-class>
+
+    <process-class name="neaccess" level="2">
+        <!--
+            Only one NE Access process is permitted per CCC.  This must
+            not be started or stopped using the PM RMI interface except when
+            dealing with failure conditions.
+        -->
+        <auto-restart/>
+        <run-at-start tier="master" type="single"/>
+        <main-class name="com.marconi.CCC.neaccess.Main"/>
+        <jvm-type value="server"/>
+        <jvm-args>
+            <arg value="-Xmx1024m"/>
+            <arg value="${jvmargs.debug.arg1}" />
+            <arg value="${jvmargs.debug.arg2}" />
+            <arg value="${jvmargs.debug.arg3}" />
+            <arg value="${jvmargs.debug.neaccess}" />
+        </jvm-args>
+        <classpath>
+            <path value="${ccc.install}/ext/jacorb.jar"/>
+            <path value="${ccc.install}/ext/logkit-1.2.jar"/>
+            <path value="${ccc.install}/ext/avalon-framework-4.1.5.jar"/>
+            <path value="${ccc.install}/ext/jboss-client-7.1.0.Final.jar"/>
+            <path value="${ccc.install}/lib/procman.jar"/>
+            <path value="${ccc.install}/lib/alarmRmi.jar"/>
+            <path value="${ccc.install}/lib/pdmRmi.jar"/>
+            <path value="${ccc.install}/lib/neaccessRmi.jar"/>
+            <path value="${ccc.install}/lib/schemamapping.jar"/>
+            <path value="${ccc.install}/ext/log4j-1.2.16.jar"/>
+            <path value="${ccc.install}/ext/postgresql.jar"/>
+            <path value="${ccc.install}/ext/xstream-1.1.1.jar"/>
+            <path value="${ccc.install}/lib/nlstext.jar"/>
+            <path value="${ccc.install}/lib/common.jar"/>
+            <path value="${ccc.install}/lib/comms.jar"/>
+            <path value="${ccc.install}/lib/dmi.jar"/>
+            <path value="${ccc.install}/lib/pdm.jar"/>
+            <path value="${ccc.install}/lib/pen.jar"/>
+            <path value="${ccc.install}/lib/em.jar"/>
+            <path value="${ccc.install}/lib/cccserver.jar"/>
+            <path value="${ccc.install}/lib/pojobase.jar"/>
+            <path value="${ccc.install}/lib/pojolayer.jar"/>
+            <path value="${ccc.install}/lib/tmplsinterface.jar"/>
+            <path value="${ccc.install}/ext/hibernate3.jar"/>
+            <path value="${ccc.install}/ext/dom4j-1.6.1.jar"/>
+            <path value="${ccc.install}/ext/commons-lang-2.1.jar"/>
+            <path value="${ccc.install}/ext/commons-logging-1.0.4.jar"/>
+            <path value="${ccc.install}/ext/ehcache-1.2.3.jar"/>
+            <path value="${ccc.install}/ext/cglib-2.1.3.jar"/>
+            <path value="${ccc.install}/ext/antlr-2.7.6.jar"/>
+            <path value="${ccc.install}/ext/asm-attrs.jar"/>
+            <path value="${ccc.install}/ext/asm.jar"/>
+            <path value="${ccc.install}/ext/xerces-2.6.2.jar"/>
+            <path value="${ccc.install}/ext/jaxen-1.1-beta-7.jar"/>
+            <path value="${ccc.install}/ext/commons-collections-2.1.1.jar"/>
+            <!--<path value="${ccc.install}/ext/c3p0-0.9.0.jar"/>-->
+            <path value="${ccc.install}/ext/c3p0-0.9.1.2.jar"/>
+            <path value="${ccc.install}/ext/jaas.jar"/>
+            <path value="${ccc.install}/ext/jacc-1_0-fr.jar"/>
+            <path value="${ccc.install}/ext/jdbc2_0-stdext.jar"/>
+            <path value="${ccc.install}/ext/jta.jar"/>
+        </classpath>
+        <jvm-properties>
+            <property name="org.omg.CORBA.ORBClass" value="org.jacorb.orb.ORB"/>  
+            <property name="org.omg.CORBA.ORBSingletonClass" value="org.jacorb.orb.ORBSingleton"/>
+            <property name="custom.props" value="${ccc.home}/data/pdm_jacorb.properties"/>      
+            <property name="rmi.token" value="${rmi.token}"/>
+            <property name="ccc.home" value="${ccc.home}"/>
+            <property name="dbserver" value="${db.addr}:${db.port}"/>
+            <property name="log.file" value="${ccc.log.dir}/soesa_neaccess.log"/>
+            <property name="ns.addr" value="${ns.addr}"/>
+            <property name="ns.port" value="${ns.port}"/>
+            <property name="eventLoggerJndi.props" value="${ccc.home}/data/eventLoggerJndi.properties"/>
+            <property name="eventLoggerJMS" value="nsm/queue/EventLoggingQueue"/>
+        </jvm-properties>
+        <identifying-properties/>
+        <startup-dependencies>
+            <database/>
+        </startup-dependencies>
+        <running-dependencies>
+            <database/>
+        </running-dependencies>
+    </process-class>
+    <process-class name="q38" level="2">
+        <!--
+            Only one NE Access process is permitted per CCC.  This must
+            not be started or stopped using the PM RMI interface except when
+            dealing with failure conditions.
+        -->
+        <auto-restart/>
+        <run-at-start tier="master" type="single"/>
+        <main-class name="com.marconi.CCC.Q38.Main"/>
+        <jvm-type value="server"/>
+        <jvm-args>
+            <arg value="-Xmx256m"/>
+            <!-- Uncomment to connect via Eclipse remote debugger:
+            <arg value="${jvmargs.debug.arg1}" />
+            <arg value="${jvmargs.debug.arg2}" />
+            <arg value="${jvmargs.debug.arg3}" />
+            <arg value="${jvmargs.debug.q38}" />
+            -->
+        </jvm-args>
+        <classpath>
+            <path value="${java.class.path}"/>
+            <path value="${ccc.install}/ext/log4j-1.2.16.jar"/>
+            <path value="${ccc.install}/ext/postgresql.jar"/>
+            <path value="${ccc.install}/ext/commons-collections-3.1.jar"/>
+            <path value="${ccc.install}/ext/jakarta-oro-2.0.8.jar"/>
+            <path value="${ccc.install}/ext/xstream-1.1.1.jar"/>
+            <path value="${ccc.install}/lib/nlstext.jar"/>
+            <path value="${ccc.install}/lib/common.jar"/>
+            <path value="${ccc.install}/lib/comms.jar"/>
+            <path value="${ccc.install}/lib/dmi.jar"/>
+            <path value="${ccc.install}/lib/pdm.jar"/>
+            <path value="${ccc.install}/lib/pen.jar"/>
+            <path value="${ccc.install}/lib/asnkernel.jar"/>
+            <path value="${ccc.install}/lib/i38.jar"/>
+            <path value="${ccc.install}/lib//cccserver.jar"/>
+        </classpath>
+        <jvm-properties>
+            <property name="rmi.token" value="${rmi.token}"/>
+            <property name="mv38.versions" value="${ccc.install}/data/MV38versions.ini"/>
+            <property name="app.ini" value="${ccc.install}/data/Q38Config.ini"/>
+            <property name="log.file" value="${ccc.log.dir}/soesa_Q38.log"/>
+            <property name="log.ini" value="${ccc.install}/data/q38_logging.properties"/>
+            <property name="dbserver" value="${db.addr}:${db.port}"/>
+            <property name="data.dir" value="${ccc.install}/data/"/>
+        </jvm-properties>
+        <identifying-properties/>
+        <startup-dependencies>
+            <database/>
+        </startup-dependencies>
+        <running-dependencies>
+            <database/>
+        </running-dependencies>
+    </process-class>
+    <process-class name="broker" level="2">
+        <!--
+            Only one Broker process is permitted per CCC.  This must
+            not be started or stopped using the PM RMI interface except when
+            dealing with failure conditions.
+        -->
+        <main-class name="com.marconi.CCC.Broker.ApplicationMain"/>
+        <jvm-type value="server"/>
+        <auto-restart/>
+        <run-at-start tier="master" type="single"/>
+        <jvm-args>
+            <arg value="-Xmx256m"/>
+            <!-- Uncomment to connect via Eclipse remote debugger:
+            <arg value="${jvmargs.debug.arg1}" />
+            <arg value="${jvmargs.debug.arg2}" />
+            <arg value="${jvmargs.debug.arg3}" />
+            <arg value="${jvmargs.debug.broker}" />
+            -->
+        </jvm-args>
+        <classpath>
+            <path value="${java.class.path}"/>
+            <path value="${ccc.install}/ext/jacorb.jar"/>
+            <path value="${ccc.install}/ext/antlr-2.7.2.jar"/>
+            <path value="${ccc.install}/ext/logkit-1.2.jar"/>
+            <path value="${ccc.install}/ext/avalon-framework-4.1.5.jar"/>
+            <path value="${ccc.install}/ext/concurrent-1.3.2.jar"/>
+            <path value="${ccc.install}/ext/log4j-1.2.16.jar"/>
+            <path value="${ccc.install}/lib/nlstext.jar"/>
+            <path value="${ccc.install}/lib/common.jar"/>
+            <path value="${ccc.install}/lib/dmi.jar"/>
+            <path value="${ccc.install}/lib/cccbroker.jar"/>
+        </classpath>
+        <jvm-properties>
+            <property name="log.file" value="${ccc.log.dir}/soesa_broker.log"/>
+            <property name="ccc.home" value="${ccc.home}"/>
+            <property name="custom.props" value="${ccc.home}/data/brokerJacorb.properties"/>
+            <property name="org.omg.CORBA.ORBClass" value="org.jacorb.orb.ORB"/>
+            <property name="org.omg.CORBA.ORBSingletonClass" value="org.jacorb.orb.ORBSingleton"/>
+            <property name="ORBInitRef.NameService" value="${ORBInitRef.NameService}"/>
+        </jvm-properties>
+        <identifying-properties/>
+    </process-class>
+    <process-class name="alarm" level="3">
+        <!--
+            Only one Alarm process is permitted per CCC.
+        -->
+        <main-class name="com.marconi.ccc.alarm.ApplicationMain"/>
+        <jvm-type value="server"/>
+        <auto-restart/>
+        <run-at-start tier="master" type="single"/>
+        <jvm-args>
+            <arg value="-Xmx256m"/>
+            <!-- Uncomment to connect via Eclipse remote debugger:
+            <arg value="${jvmargs.debug.arg1}" />
+            <arg value="${jvmargs.debug.arg2}" />
+            <arg value="${jvmargs.debug.arg3}" />
+            <arg value="${jvmargs.debug.alarm}" />
+            -->
+        </jvm-args>
+        <classpath>
+            <path value="${java.class.path}"/>
+            <path value="${ccc.install}/ext/jacorb.jar"/>
+            <path value="${ccc.install}/ext/antlr-2.7.2.jar"/>
+            <path value="${ccc.install}/ext/logkit-1.2.jar"/>
+            <path value="${ccc.install}/ext/avalon-framework-4.1.5.jar"/>
+            <path value="${ccc.install}/ext/concurrent-1.3.2.jar"/>
+            <path value="${ccc.install}/ext/log4j-1.2.16.jar"/>
+            <path value="${ccc.install}/lib/alarm.jar"/>
+            <path value="${ccc.install}/lib/alarmRmi.jar"/>
+            <path value="${ccc.install}/lib/dmi.jar"/>
+            <path value="${ccc.install}/lib/common.jar"/>
+            <path value="${ccc.install}/lib/nlstext.jar"/>
+            <path value="${ccc.install}/lib/pdmRmi.jar"/>
+            <path value="${ccc.install}/lib/pen.jar"/>
+
+            <path value="${ccc.install}/ext/jboss-client-7.1.0.Final.jar"/>
+        </classpath>
+        <jvm-properties>
+            <property name="log.ini" value="${ccc.home}/data/alarmLogging.properties"/>
+            <property name="app.ini" value="${ccc.home}/data/AlarmServerConfig.ini"/>
+            <property name="custom.props" value="${ccc.home}/data/brokerJacorb.properties"/>
+            <property name="log.file" value="${ccc.log.dir}/soesa_alarm.log"/>
+            <property name="org.omg.CORBA.ORBClass" value="org.jacorb.orb.ORB"/>
+            <property name="org.omg.CORBA.ORBSingletonClass" value="org.jacorb.orb.ORBSingleton"/>
+            <property name="dbserver" value="${db.addr}:${db.port}"/>
+            <property name="ORBInitRef.NameService" value="${ORBInitRef.NameService}"/>
+
+            <property name="alarmJmsJndi.props" value="${ccc.home}/data/alarmJmsJndi.properties"/>
+        </jvm-properties>
+        <startup-dependencies>
+            <running-process name="broker"/>
+        </startup-dependencies>
+        <running-dependencies>
+            <running-process name="broker"/>
+        </running-dependencies>
+        <identifying-properties/>
+    </process-class>
+    <process-class name="server" level="3">
+        <!--
+            The client's server back-end process.  Each server process has a unique
+            integer index.
+
+            Required RMI interface parameters:
+            process.instance - Unique integer instance number value >= 0
+        -->
+        <auto-restart/>
+        <run-at-start tier="master" type="count" count="${server.instances.minimum}"/>
+        <!-- Future
+        <run-at-start tier="slave" type="count" count="2"/>
+        -->
+        <main-class name="com.marconi.CCC.Server.ApplicationMain"/>
+        <jvm-type value="server"/>
+        <jvm-args>
+            <arg value="-Xms448m"/>
+            <arg value="-Xmx1792m"/>
+            <arg value="${jvmargs.debug.arg1}" />
+            <arg value="${jvmargs.debug.arg2}" />
+            <arg value="${jvmargs.debug.arg3}" />
+            <arg value="${jvmargs.debug.server}" />
+        </jvm-args>
+        <classpath>
+            <path value="${ccc.install}/ext/nsm-client.jar"/>
+            <path value="${ccc.install}/ext/jboss-client-7.1.0.Final.jar"/>
+
+            <path value="${ccc.install}/lib/schemamapping.jar"/>
+            <path value="${ccc.install}/ext/jacorb.jar"/>
+            <path value="${ccc.install}/ext/logkit-1.2.jar"/>
+            <path value="${ccc.install}/ext/avalon-framework-4.1.5.jar"/>
+            <path value="${ccc.install}/ext/concurrent-1.3.2.jar"/>
+            <path value="${ccc.install}/ext/log4j-1.2.16.jar"/>
+            <path value="${ccc.install}/ext/postgresql.jar"/>
+            <path value="${ccc.install}/ext/jakarta-oro-2.0.8.jar"/>
+            <path value="${ccc.install}/ext/utils_common.jar"/>
+            <path value="${ccc.install}/ext/xstream-1.1.1.jar"/>
+            <path value="${ccc.install}/lib/nlstext.jar"/>
+            <path value="${ccc.install}/lib/common.jar"/>
+            <path value="${ccc.install}/lib/comms.jar"/>
+            <path value="${ccc.install}/lib/dmi.jar"/>
+            <path value="${ccc.install}/lib/em.jar"/>
+            <path value="${ccc.install}/lib/pdm.jar"/>
+            <path value="${ccc.install}/lib/cccserver.jar"/>
+            <path value="${ccc.install}/lib/alarmRmi.jar"/>
+            <path value="${ccc.install}/lib/mplstpRmi.jar"/>
+            <path value="${ccc.install}/lib/pojobase.jar"/>
+            <path value="${ccc.install}/lib/pojolayer.jar"/>
+            <path value="${ccc.install}/lib/tmplsinterface.jar"/>
+            <path value="${ccc.install}/ext/hibernate3.jar"/>
+            <path value="${ccc.install}/ext/dom4j-1.6.1.jar"/>
+            <path value="${ccc.install}/ext/commons-lang-2.1.jar"/>
+            <path value="${ccc.install}/ext/commons-logging-1.0.4.jar"/>
+            <path value="${ccc.install}/ext/ehcache-1.2.3.jar"/>
+            <path value="${ccc.install}/ext/cglib-2.1.3.jar"/>
+            <path value="${ccc.install}/ext/antlr-2.7.6.jar"/>
+            <path value="${ccc.install}/ext/asm-attrs.jar"/>
+            <path value="${ccc.install}/ext/asm.jar"/>
+            <path value="${ccc.install}/ext/xerces-2.6.2.jar"/>
+            <path value="${ccc.install}/ext/jaxen-1.1-beta-7.jar"/>
+            <path value="${ccc.install}/ext/commons-collections-2.1.1.jar"/>
+            <path value="${ccc.install}/ext/c3p0-0.9.1.2.jar"/>
+            <path value="${ccc.install}/ext/jaas.jar"/>
+            <path value="${ccc.install}/ext/jacc-1_0-fr.jar"/>
+            <path value="${ccc.install}/ext/jdbc2_0-stdext.jar"/>
+            <path value="${ccc.install}/ext/jta.jar"/>
+            <path value="${ccc.install}/ext/JPamWrapper-client-1.0.jar"/>
+<!--        <path value="${ccc.install}/ext/jlima_1.2.jar"/>       -->
+            <path value="/opt/ericsson/LIMA/lib/java/jlima_1.2.jar"/>
+            <path value="${ccc.install}/lib/asnkernel.jar"/>
+            <path value="${ccc.install}/lib/i38.jar"/>
+        </classpath>
+        <jvm-properties>
+            <property name="log.file" value="${ccc.log.dir}/soesa_server_${process.instance}.log"/>
+            <property name="tmpls.log.file" value="${ccc.log.dir}/soesa_tmpls.log"/>
+            <property name="server.instance" value="${process.instance}"/>
+            <property name="ccc.home" value="${ccc.home}"/>
+            <property name="custom.props" value="${ccc.home}/data/serverJacorb.properties"/>
+            <property name="org.omg.CORBA.ORBClass" value="org.jacorb.orb.ORB"/>
+            <property name="org.omg.CORBA.ORBSingletonClass" value="org.jacorb.orb.ORBSingleton"/>
+            <property name="ORBInitRef.NameService" value="${ORBInitRef.NameService}"/>
+            <property name="dbserver" value="${db.addr}:${db.port}"/>
+            <property name="check.enable" value="true"/>
+            <property name="jboss.ejb.client.properties.file.path" value="${ccc.home}/data/jboss-ejb-client.properties"/>
+
+            <property name="alarmJmsJndi.props" value="${ccc.home}/data/alarmJmsJndi.properties"/>
+            <property name="serviceEventJMS" value="nsm/queue/NsmCccServerEventQueue"/>
+
+            <property name="neEventJmsJndi.props" value="${ccc.home}/data/neEventJmsJndi.properties"/>
+            <property name="neEventJMS" value="nsm/queue/EsaNeInventoryQueue"/>
+
+            <property name="eventLoggerJndi.props" value="${ccc.home}/data/eventLoggerJndi.properties"/>
+            <property name="eventLoggerJMS" value="nsm/queue/EventLoggingQueue"/>
+        </jvm-properties>
+        <startup-dependencies>
+            <running-process name="neaccess"/>
+            <running-process name="q38"/>
+            <running-process name="broker"/>
+            <database/>
+            <nameservice-entry nameserver="" context="ServiceON/ClientCircuitCentre.Broker"/>
+        </startup-dependencies>
+        <running-dependencies>
+            <running-process name="neaccess"/>
+            <running-process name="q38"/>
+            <running-process name="broker"/>
+            <database/>
+        </running-dependencies>
+        <identifying-properties>
+            <property name="process.instance"/>
+        </identifying-properties>
+    </process-class>
+    <process-class name="pdm" level="4">
+        <!--
+            PDM access proxy process.  One of these is started for each element manager.
+
+            Command to start a jconsole for _all_ pdm processes
+            $JAVA_HOME/bin/jconsole `$JAVA_HOME/bin/jps -lm | sort | grep pdm | cut -f -1 -d \  | paste -s -d " " `
+
+            Required RMI parameters:
+            createEMActionId - neaccess process jobId;
+                               PDM process registers back with the neaccess process, and returns this handle
+            em.id            - Element manager ID;
+                               element_manager_pk field from the element_manager table in the database.
+            ns.addr          - PEN naming service address
+            ns.port          - PEN naming service port
+            ns.context       - PEN context to use within the naming tree
+            pen.user.name    - PEN user name
+            pen.password     - PEN password
+        -->
+        <main-class name="com.marconi.CCC.neaccess.pdm.Main"/>
+        <jvm-type value="server"/>
+        <auto-restart/>
+        <run-at-start tier="master" type="sql">
+            <query>
+                SELECT
+                    element_manager_pk AS "em.id",
+                    pen_naming_service_addr AS "ns.addr",
+                    pen_port AS "ns.port",
+                    em_em_name AS "em.name",
+                    pen_user_name AS "pen.user.name",
+                    pen_password AS "pen.password",
+                    case WHEN notification_state='f' then 'false' else 'true' end AS "em.alarmNotification",
+                    -1 AS "createEMActionId"
+                FROM
+                    element_manager
+                WHERE
+                    ccc_em_type = 1
+                ORDER BY
+                    1
+            </query>
+        </run-at-start>
+        <startup-dependencies>
+            <running-process name="neaccess"/>
+            <database/>
+        </startup-dependencies>
+        <running-dependencies>
+            <!--
+            <running-process name="neaccess"/>
+            -->
+            <database/>
+        </running-dependencies>
+        <jvm-args>
+            <arg value="-Xmx256m"/>
+            <arg value="${jvmargs.debug.arg1}" />
+            <arg value="${jvmargs.debug.arg2}" />
+            <arg value="${jvmargs.debug.arg3}" />
+            <arg value="${jvmargs.debug.pdm}" />
+        </jvm-args>
+        <classpath>
+            <path value="${java.class.path}"/>
+            <path value="${ccc.install}/ext/jacorb.jar"/>
+            <path value="${ccc.install}/ext/antlr-2.7.2.jar"/>
+            <path value="${ccc.install}/ext/logkit-1.2.jar"/>
+            <path value="${ccc.install}/ext/avalon-framework-4.1.5.jar"/>
+            <path value="${ccc.install}/ext/concurrent-1.3.2.jar"/>
+            <path value="${ccc.install}/ext/log4j-1.2.16.jar"/>
+            <path value="${ccc.install}/ext/xstream-1.1.1.jar"/>
+            <path value="${ccc.install}/lib/nlstext.jar"/>
+            <path value="${ccc.install}/lib/common.jar"/>
+            <path value="${ccc.install}/lib/comms.jar"/>
+            <path value="${ccc.install}/lib/pdm_1_1.jar"/>
+            <path value="${ccc.install}/lib/pdm_1_2.jar"/>
+            <path value="${ccc.install}/lib/pdm_2_0.jar"/>
+            <path value="${ccc.install}/lib/pdm_3_0.jar"/>
+            <path value="${ccc.install}/lib/pdm_4_0.jar"/>
+            <path value="${ccc.install}/lib/pdm_5_0.jar"/>
+            <path value="${ccc.install}/lib/pdm_5_1.jar"/>
+            <path value="${ccc.install}/lib/pdm_6_0.jar"/>
+            <path value="${ccc.install}/lib/pdm_6_1.jar"/>
+            <path value="${ccc.install}/lib/pdm_7_0.jar"/>
+            <path value="${ccc.install}/lib/pdm_7_2.jar"/>
+            <path value="${ccc.install}/lib/pdm_8_1.jar"/>
+            <path value="${ccc.install}/lib/pdm_8_2.jar"/>
+            <path value="${ccc.install}/lib/pdm.jar"/>
+            <path value="${ccc.install}/lib/pen.jar"/>
+            <path value="${ccc.install}/lib/cccserver.jar"/>
+            <path value="${ccc.install}/lib/em.jar"/>
+            <path value="${ccc.install}/lib/alarm.jar"/>
+            <path value="${ccc.install}/lib/alarmRmi.jar"/>
+            <path value="${ccc.install}/lib/pdmRmi.jar"/>
+            <path value="${ccc.install}/lib/dmi.jar"/>
+        </classpath>
+        <jvm-properties>
+            <property name="pid" value="@pid"/>
+            <property name="log.ini" value="${ccc.home}/data/pdm_logging.properties"/>
+            <property name="log.file" value="${ccc.log.dir}/soesa_pdm_${em.id}.log"/>
+            <property name="ccc.home" value="${ccc.home}"/>
+            <property name="realign.archive.dir" value="${ccc.log.dir}/EM_${em.id}/"/>
+            <property name="custom.props" value="${ccc.home}/data/pdm_jacorb.properties"/>
+            <property name="org.omg.CORBA.ORBClass" value="org.jacorb.orb.ORB"/>
+            <property name="org.omg.CORBA.ORBSingletonClass" value="org.jacorb.orb.ORBSingleton"/>
+            <property name="ORBInitRef.NameService" value="corbaloc:iiop:1.0@${ns.addr}:${ns.port}/NameService"/>
+            <property name="em.id" value="${em.id}"/>
+            <property name="em.name" value="${em.name}"/>
+            <property name="em.alarmNotification" value="${em.alarmNotification}"/>
+            <property name="pen.username" value="${pen.user.name}"/>
+            <property name="pen.password" value="${pen.password}"/>
+            <property name="createEMActionId" value="${createEMActionId}"/>
+            <property name="rmi.server.retryAttempts" value="12"/>    <!--   Default is 900 attempts, but is this really necessary? -->
+            <property name="emConnection.pollingSchemePerDEM" value="true"/>
+            <!--   maximum number of comms up/down etc notifications which are sent to the neaccess process in one go -->
+            <!--   0 means there is no limit to the list size -->
+            <!--   if not specified the default size is 1     -->
+            <property name="emListener.notificationListSize" value="0"/>
+        </jvm-properties>
+        <app-args/>
+        <identifying-properties>
+            <property name="em.id"/>
+        </identifying-properties>
+    </process-class>
+
+</process-config>
+

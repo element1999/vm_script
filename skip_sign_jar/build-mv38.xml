@@ -1,0 +1,138 @@
+<?xml version="1.0"?>
+<project name="ccc" basedir="." default="build">
+
+  <import file="../build-module.xml"/>
+
+  <property name="arch.dir" location="${basedir}/arch"/>
+  <property name="nm.dir" location="${basedir}/nm/arch"/>
+  <property name="app.dir" location="${basedir}/ccc/app"/>
+  <property name="runtime.dir" location="${basedir}/ccc/RUNTIME/lib"/>
+  <property name="buildtools.dir" location="${basedir}/buildtools"/>
+	
+  <path id="arch.classpath">
+    <fileset dir="${lib.dir}">
+      <include name="javax/help/javahelp/2.0.02/*.jar"/>
+    </fileset>
+  </path>
+  
+  <path id="app.classpath">
+    <fileset dir="${modules.dir}">
+      <include name="data/jar/data.jar"/>
+      <include name="dmi/jar/dmi.jar"/>
+      <include name="client/jar/client.jar"/>
+      <include name="common/jar/common.jar"/>
+    </fileset>
+    <fileset dir="${lib.dir}">
+      <include name="log4j/log4j/1.2.16/*.jar"/>
+    </fileset>
+  </path>
+
+  <target name="build">
+    <mkdir dir="${runtime.dir}"/>
+    <antcall inheritRefs="true">
+      <target name="build-arch"/>
+      <target name="build-nm"/>
+      <target name="build-app"/>
+    </antcall>
+    <antcall target="jar-resources"/>
+  </target>
+  
+  <target name="build-arch">
+    <mkdir dir="${arch.dir}/bin"/>
+    <javac srcdir="${arch.dir}/src" destdir="${arch.dir}/bin"
+           classpathref="arch.classpath"/>
+    <copy todir="${arch.dir}/bin">
+      <fileset dir="${arch.dir}/resource">
+        <include name="**/*.dtd"/>
+        <include name="**/*.xml"/>
+        <include name="**/*.html"/>
+        <include name="**/*.gif"/>
+        <include name="**/*.jpeg"/>
+        <include name="**/*.properties"/>
+      </fileset>
+    </copy>
+    <jar destfile="${runtime.dir}/arch.jar" index="true">
+      <fileset dir="${arch.dir}/bin">
+        <include name="MODULE.dtd"/>
+        <include name="GUI.dtd"/>
+        <include name="com/**/*"/>
+      </fileset>
+    </jar>
+  </target>
+  
+  <target name="build-nm">
+    <mkdir dir="${nm.dir}/bin"/>
+    <javac srcdir="${nm.dir}/src" destdir="${nm.dir}/bin">
+      <classpath>
+        <pathelement location="${arch.dir}/bin"/>
+        <path refid="arch.classpath"/>
+      </classpath>
+    </javac>
+    <jar destfile="${runtime.dir}/nm.jar" index="true">
+      <fileset dir="${nm.dir}/bin">
+        <include name="com/**/*"/>
+      </fileset>
+    </jar>
+  </target>
+  
+  <target name="build-app">
+    <mkdir dir="${app.dir}/bin"/>
+    <javac srcdir="${app.dir}/src" destdir="${app.dir}/bin">
+      <classpath>
+        <pathelement location="${arch.dir}/bin"/>
+        <pathelement location="${nm.dir}/bin"/>
+        <path refid="arch.classpath"/>
+        <path refid="app.classpath"/>
+      </classpath>
+    </javac>
+    <jar destfile="${runtime.dir}/ccc.jar" index="true">
+      <fileset dir="${app.dir}/bin">
+        <include name="com/**/*"/>
+      </fileset>
+    </jar>
+  </target>
+
+  <target name="jar-resources">
+    <jar destfile="${runtime.dir}/resources.jar" index="true">
+      <fileset dir="${basedir}/resource">
+        <include name="defaultresource/**/*"/>
+      </fileset>
+      <fileset dir="${basedir}/ccc/resource">
+        <include name="cccresource/**/*"/>
+      </fileset>
+    </jar>
+  </target>
+
+  <target name="clean">
+    <delete dir="${arch.dir}/bin"/>
+    <delete dir="${nm.dir}/bin"/>
+    <delete dir="${app.dir}/bin"/>
+    <delete dir="${basedir}/ccc/RUNTIME"/>
+  </target>
+  
+  <target name="deploy">
+    <fail unless="esa.home"/>
+    <fail unless="keystore.alias"/>
+    <fail unless="keystore.pass"/>
+    <fail unless="keystore.file"/>
+    <available property="keystore.available" file="${keystore.file}"/>
+    <fail unless="keystore.available"/>
+  	
+    <copy todir="${esa.home}/lib">
+      <fileset dir="${runtime.dir}" includes="**/*.jar"/>
+    </copy>
+	<antcall target="signcccjar"/>
+  </target>
+  <target name="signmv38jar" unless="skip.signjar>
+	   <signjar alias="${keystore.alias}" storepass="${keystore.pass}"
+             keypass="${keystore.pass}" keystore="${keystore.file}">
+      <fileset dir="${esa.home}/lib">
+        <include name="arch.jar"/>
+        <include name="nm.jar"/>
+        <include name="ccc.jar"/>
+        <include name="resources.jar"/>
+      </fileset>
+    </signjar>
+  </target>
+
+</project>

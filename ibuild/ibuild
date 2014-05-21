@@ -1,0 +1,10 @@
+#!/bin/bash
+cd `dirname $0`
+cp ibuild.rb $proj/
+cp ibuild_t.xml  $proj/
+cd $proj
+ruby ibuild.rb
+#ant -f build_gen.xml clean build
+rm $proj/ibuild.rb
+rm $proj/ibuild_gen.xml
+rm $proj/ibuild_t.xml

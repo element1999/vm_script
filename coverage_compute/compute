@@ -1,0 +1,27 @@
+#!/bin/bash
+cur_dir=`pwd $0`
+echo $cur_dir
+target=$cur_dir/report/$2
+mkdir -p $target
+cd $proj
+git reset --hard @
+git checkout rel_LSV_14B
+
+git diff $1 $2 > $target/diff_result.txt
+git checkout $1
+sed -i  '/<\/jacoco:coverage>/a\<antcall target="generate-coverage-report"/>\' build-test.xml
+cd nsm
+sed -i  '/<!-- generate coverage report -->/a\<antcall target="generate-coverage-report"/>\' build.xml
+cd -
+ant clean build test
+mkdir $target/nsm
+mkdir $target/cccserver
+mkdir $target/em
+mkdir $target/pojolayer
+
+cp -r $proj/nsm/test/report/ $target/nsm/
+cp -r /mnt/git_repo/iptnms-p/dev/modules/cccserver/testreport/ $target/cccserver/
+cp -r /mnt/git_repo/iptnms-p/dev/modules/pojolayer/testreport/ $target/pojolayer/
+cp -r /mnt/git_repo/iptnms-p/dev/modules/em/testreport/ $target/em/
+
+utdc -d $target -s $target -f $target/diff_result.txt 

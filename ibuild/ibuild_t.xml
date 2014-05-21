@@ -1,0 +1,541 @@
+<?xml version="1.0"?>
+<project name="iptnms-packet" basedir="." default="build">
+
+  <property file="build.properties"/>
+
+  <property name="root.dir" location="${basedir}/../.."/>
+	<property name="gui.ccc.build.dir" location="${basedir}/mv38_nui_dev"/>
+	<property name="nsm.dir" location="${basedir}/nsm"/>
+	<property name="mv36sim.dir" location="${basedir}/mv36sim"/>
+
+	<property name="keystore.file" location="${basedir}/.keystore"/>
+	<property name="keystore.alias" value="IPT-NMS-Packet"/>
+	<property name="keystore.pass" value="ericsson"/>
+	<property name="keystore.algorithm" value="RSA"/>
+	<property name="keystore.keysize" value="2048"/>
+	<property name="signing.cert.validity.duration" value="730"/>
+	<property name="signing.cert.common.name" value="Ericsson Canada"/>
+	<property name="signing.cert.organization" value="IP Transport NMS"/>
+	<property name="signing.cert.organizational.unit" value="Packet"/>
+	<property name="signing.cert.location" value="Burnaby"/>
+	<property name="signing.cert.province" value="British Columbia"/>
+	<property name="signing.cert.country.code" value="CA"/>
+
+	<property name="soesa.version" value="10.0-59"/>
+	<property name="soesa.dot.version" value="10.0.59"/>
+
+	<target name="build" description="Build server and client components">
+		<antcall target="esa"/>
+		<%if has_nsm%>
+		<ant dir="${nsm.dir}" inheritAll="false">
+			<target name="bind"/>
+			<target name="build-nsm-archive"/>
+			<target name="build-correlation-archive"/>
+		</ant>
+		<%end%>
+		<%if has_license%>
+		<ant dir="license" target="build" inheritAll="false"/>
+		<%end%>
+	</target>
+
+	<target name="release" description="Build release">
+		<fail if="esa.home"
+          message="esa.home must not be set"/>
+		<property name="for.release" value="true"/>
+		<!-- Add CCRC metadata files to default exclusion file set  -->
+		<defaultexcludes add="**/.copyarea.db"/>
+		<defaultexcludes add="**/*.keep"/>
+		<defaultexcludes add="**/*.keep.*"/>
+		<antcall target="esa">
+			<param name="javac.debug" value="true"/>
+		</antcall>
+		<tempfile property="esa.home" suffix="-root"
+              destdir="${java.io.tmpdir}" prefix="esa-home-"/>
+		<antcall target="deploy-esa"/>
+		<ant dir="${nsm.dir}" target="rpm-packet"
+         inheritAll="false">
+			<property name="dmi.content.root" value="${esa.home}"/>
+		</ant>
+
+		<antcall target="test-nsm"/>
+		<antcall target="test-esa"/>
+
+		<ant dir="${nsm.dir}" target="rpm-installer" inheritAll="false"/>
+		<ant dir="license" target="rpm-lm" inheritAll="false"/>
+		<ant dir="${nsm.dir}" target="rpm-pg-migrator" inheritAll="false"/>
+		<ant dir="${nsm.dir}" target="tar-iptnms-upgrade-toolkit" inheritAll="false"/>
+		<ant dir="${nsm.dir}" target="rpm-hardening-tools" inheritAll="false"/>
+
+		<antcall target="package-mv36sim"/>
+	
+	</target>
+
+	<target name="package-mv36sim" description="Compile and build mv36sim rpm" if="package.mv36sim">
+		<ant dir="${mv36sim.dir}" target="build" inheritAll="false"/>
+		<ant dir="${mv36sim.dir}" target="rpm" inheritAll="false">
+			<property name="release.version" value="${release.version}"/>
+		</ant>
+	</target>
+
+	<target name="esa">
+		<antcall target="modules"/>
+		<antcall target="thick-client"/>
+	</target>
+
+	<target name="modules" description="Build server modules">
+		<antcall target="buildsequence">
+			<param name="target" value="build"/>
+		</antcall>
+	</target>
+
+	<target name="thick-client" description="Build thick client component">
+    <ant dir="${gui.ccc.build.dir}" target="build" inheritAll="false" inheritrefs="true"/>
+	</target>
+
+	<!-- inmemorydatabase jar file is only used for junit test, so it's not included in the production build -->
+	<target name="build-inmemorydatabase" description="build inmemorydatase jar file">
+		<ant dir="inmemorydatabase" target="build"/>
+	</target>
+
+	<target name="test" depends="test-nsm, test-esa"
+          description="Run all unit tests">
+	</target>
+
+	<target name="test-esa" depends="build-inmemorydatabase"
+          description="Run unit tests" unless="skip.test">
+          <!--
+		<ant dir="cccserver" target="test"/>
+	-->
+		<%if has_em%>
+		<ant dir="em" target="test"/>
+		<%end%>
+		<%if has_pojolayer%>
+		<ant dir="pojolayer" target="test"/>
+		<%end%>
+		<%if has_inmemorydatabase%>
+		<ant dir="inmemorydatabase" target="test"/>
+		<%end%>
+		<%if has_procman%>
+		<ant dir="procman" target="test"/>
+		<%end%>
+	</target>
+
+	<target name="test-nsm" unless="skip.test">
+		<%if has_nsm%>
+		<ant dir="${nsm.dir}" target="junit-test" inheritAll="false">
+			<property name="test.summary.print" value="true"/>
+			<property name="test.failonerror" value="false"/>
+		</ant>
+		<%end%>
+	</target>
+
+	<target name="clean-test" description="Clean test result">
+		<%if has_inmemorydatabase%>
+		<ant dir="inmemorydatabase" target="clean-test"/>
+		<%end%>
+		<%if has_em%>
+		<ant dir="em" target="clean-test"/>
+		<%end%>
+		<%if has_pojolayer%>
+		<ant dir="pojolayer" target="clean-test"/>
+		<%end%>
+		<%if has_cccserver%>
+		<ant dir="cccserver" target="clean-test"/>
+		<%end%>
+	</target>
+
+	<target name="clean" description="Clean the project">
+		<antcall target="buildsequence">
+			<param name="target" value="clean"/>
+		</antcall>
+		<ant dir="${gui.ccc.build.dir}" target="clean" inheritAll="false"/>
+		<%if has_nsm%>
+		<ant dir="${nsm.dir}" target="clean" inheritAll="false"/>
+		<%end%>
+		<delete file="${keystore.file}" failonerror="no"/>
+		<%if has_inmemorydatabase%>
+		<ant dir="inmemorydatabase" target="clean"/>
+		<%end%>
+		<%if has_license%>
+            <ant dir="license" target="clean"/>
+		<%end%>
+	</target>
+
+	<target name="deploy-esa" description="Deploy ESA JAR files and scripts">
+		<antcall target="deploy-esa-jar" />
+		<antcall target="deploy-esa-scripts" />
+	</target>
+
+	<target name="deploy-esa-jar" description="Deploy ESA JAR files">
+		<fail unless="esa.home"/>
+		<available property="keystore.available" file="${keystore.file}"/>
+		<antcall target="generate-keystore"/>
+
+		<antcall target="buildsequence2">
+			<param name="target" value="deploy"/>
+		</antcall>
+
+		<mkdir dir="${esa.home}/ext"/>
+
+
+		<copy todir="${esa.home}/lib">
+			<mapper type="flatten"/>
+			<fileset dir="${basedir}">
+				<include name="i38/jar/i38.jar"/>
+				<include name="help/*.jar"/>
+			</fileset>
+		</copy>
+
+		<ant dir="${gui.ccc.build.dir}" target="deploy" inheritAll="false">
+			<property name="esa.home" value="${esa.home}"/>
+			<property name="keystore.file" location="${keystore.file}"/>
+			<property name="keystore.alias" value="${keystore.alias}"/>
+			<property name="keystore.pass" value="${keystore.pass}"/>
+		</ant>
+
+		<copy todir="${esa.home}/ext">
+			<mapper type="flatten"/>
+      <fileset dir="${lib.dir}">
+        <include name="commons-collections/commons-collections/3.1/*.jar"/>
+        <include name="commons-net/commons-net/1.3.0/*.jar"/>
+        <include name="commons-lang/commons-lang/2.1/*.jar"/>
+        <include name="org/hibernate/hibernate/3.2.1.ga/*.jar"/>
+        <include name="antlr/antlr/2.7.6/*.jar"/>
+        <include name="asm/asm/1.5.3/*.jar"/>
+        <include name="asm/asm-attrs/1.5.3/*.jar"/>
+        <include name="c3p0/c3p0/0.9.1.2/*.jar"/>
+        <include name="cglib/cglib/2.1.3/*.jar"/>
+        <include name="commons-collections/commons-collections/2.1.1/*.jar"/>
+        <include name="commons-logging/commons-logging/1.0.4/*.jar"/>
+        <include name="concurrent/concurrent/1.3.2/*.jar"/>
+        <include name="dom4j/dom4j/1.6.1/*.jar"/>
+        <include name="net/sf/ehcache/ehcache/1.2.3/*.jar"/>
+        <include name="javax/security/jacc/1.0/*.jar"/>
+        <include name="javax/security/jaas/1.0.01/*.jar"/>
+        <include name="jaxen/jaxen/1.1-beta-7/*.jar"/>
+        <include name="javax/sql/jdbc/jdbc-stdext/2.0/*.jar"/>
+        <include name="javax/transaction/jta/1.0.1B/*.jar"/>
+        <include name="xerces/xercesImpl/2.6.2/*.jar"/>
+        <include name="antlr/antlr/2.7.2/*.jar"/>
+        <include name="org/jacorb/jacorb-idl-compiler/2.2.3/*.jar"/>
+        <include name="org/jacorb/jacorb/2.2.3/*.jar"/>
+        <include name="logkit/logkit/1.2/*.jar"/>
+        <include name="avalon-framework/avalon-framework/4.1.5/*.jar"/>
+        <include name="oro/oro/2.0.8/*.jar"/>
+        <include name="javax/help/javahelp/2.0.02/*.jar"/>
+        <include name="org/marconi/jlima/1.2.7/*.jar"/>
+        <include name="javax/xml/jaxb-api/1.0.1/*.jar"/>
+        <include name="javax/xml/jaxb-impl/1.0.5/*.jar"/>
+        <include name="javax/xml/jaxb-libs/1.0.5/*.jar"/>
+        <include name="javax/xml/jaxb-xjc/1.0.5/*.jar"/>
+        <include name="javax/xml/jax-qname/1.1/*.jar"/>
+        <include name="javax/xml/namespace/1.0.1/*.jar"/>
+        <include name="com/sun/xml/relaxngDatatype/1.0/*.jar"/>
+        <include name="com/sun/xml/xsdlib/20050614/*.jar"/>
+        <include name="postgresql/postgresql/8.2-504.jdbc3/*.jar"/>
+        <include name="xalan/xalan/2.6.0/*.jar"/>
+        <include name="com/thoughtworks/xstream/xstream/1.1.1/*.jar"/>
+        <include name="com/mindbright/mindterm/4.1.2/*.jar"/>
+        <include name="org/jboss/jboss-client/7.1.0.Final/*.jar"/>
+        <include name="log4j/log4j/1.2.16/*.jar"/>
+			</fileset>
+		</copy>
+		<copy todir="${esa.home}/ext">
+			<mapper type="flatten"/>
+			<fileset dir="${basedir}">
+				<include name="alarm/lib/*.jar"/>
+				<include name="cccserver/lib/*.jar"/>
+        <include name="nsm-client/jar/nsm-client.jar"/>
+			</fileset>
+		</copy>
+		<signjar alias="${keystore.alias}" storepass="${keystore.pass}"
+             keypass="${keystore.pass}" keystore="${keystore.file}">
+			<path>
+				<fileset dir="${esa.home}/lib">
+					<include name="i38.jar"/>
+					<include name="bsscjhrs.jar"/>
+					<include name="helpfile.jar"/>
+				</fileset>
+				<fileset dir="${esa.home}/ext">
+					<include name="antlr-2.7.2.jar"/>
+					<include name="avalon-framework-4.1.5.jar"/>
+					<include name="commons-net-1.3.0.jar"/>
+					<include name="mindterm.jar"/>
+					<include name="jacorb.jar"/>
+					<include name="log4j-1.2.16.jar"/>
+					<include name="logkit-1.2.jar"/>
+					<include name="jh.jar"/>
+				</fileset>
+			</path>
+		</signjar>
+	</target>
+
+	<target name="deploy-esa-scripts" description="Deploy ESA scripts">
+		<fail unless="esa.home"/>
+		<mkdir dir="${esa.home}/data"/>
+		<mkdir dir="${esa.home}/scripts"/>
+		<mkdir dir="${esa.home}/dbase"/>
+
+		<copy todir="${esa.home}/data">
+      <fileset dir="${root.dir}/dev/data">
+				<include name="*.properties"/>
+				<include name="*.html"/>
+				<exclude name="ServerConfig.ini" unless="for.release"/>
+				<include name="*.ini"/>
+				<include name="Process.xml" if="for.release"/>
+				<exclude name="dbAdminLogging.properties" if="for.release"/>
+				<exclude name="mv36sim*" if="for.release"/>
+				<exclude name="soesasim*" if="for.release"/>
+				<exclude name="testClientLogging.properties" if="for.release"/>
+			</fileset>
+		</copy>
+
+		<tstamp>
+			<format property="TODAY_FOR_MOSQUITO"
+              pattern="d MMMM yyyy"
+              locale="en,UK"/>
+		</tstamp>
+		<copy todir="${esa.home}/data">
+      <fileset dir="${root.dir}/dev/data">
+				<include name="mosquito.info" if="for.release"/>
+			</fileset>
+			<filterset>
+				<filter token="RELEASEDATE" value="${TODAY_FOR_MOSQUITO}"/>
+			</filterset>
+		</copy>
+
+		<copy todir="${esa.home}/scripts">
+      <fileset dir="${root.dir}/dev/scripts">
+				<include name="archiveLog"/>
+				<include name="backupDatabase"/>
+				<include name="changeHostAddress"/>
+				<include name="changeNeId"/>
+				<include name="commitDatabase"/>
+				<include name="common"/>
+				<include name="exportData"/>
+				<include name="migrateSOItoSOESA"/>
+				<include name="offlineRestoreDatabase"/>
+				<include name="README_changeNEId"/>
+				<include name="restoreDatabase"/>
+				<include name="resumeSuspendedProcesses"/>
+				<include name="saveBugReportLogsAndDB"/>
+				<include name="server"/>
+				<include name="switchDatabase"/>
+				<include name="upgrade"/>
+				<include name="vacuumDatabase"/>
+			</fileset>
+			<filterset>
+				<filter token="SOESA_VERSION" value="${soesa.dot.version}"/>
+			</filterset>
+		</copy>
+		<chmod dir="${esa.home}/scripts" perm="755"/>
+		<copy todir="${esa.home}/dbase">
+      <fileset dir="${root.dir}/dev/dbase">
+				<include name="loggingSchema"/>
+				<include name="schema"/>
+			</fileset>
+		</copy>
+	</target>
+
+	<target name="generate-keystore" unless="keystore.available">
+		<genkey alias="${keystore.alias}" storepass="${keystore.pass}"
+            keyalg="${keystore.algorithm}" keysize="${keystore.keysize}"
+            validity="${signing.cert.validity.duration}" verbose="true"
+            keypass="${keystore.pass}" keystore="${keystore.file}">
+			<dname>
+				<param name="CN" value="${signing.cert.common.name}"/>
+				<param name="O" value="${signing.cert.organization}"/>
+				<param name="OU" value="${signing.cert.organizational.unit}"/>
+				<param name="L" value="${signing.cert.location}"/>
+				<param name="ST" value="${signing.cert.province}"/>
+				<param name="C" value="${signing.cert.country.code}"/>
+			</dname>
+		</genkey>
+	</target>
+	<!--update the latest pdm-->
+	<target name="buildsequence">
+		<%for proj in res%>
+		<ant dir="<%=proj%>" target="${target}"/>
+		<%end%>
+	</target>
+<target name="buildsequence_ori">
+		<ant dir="foundation" target="${target}"/>
+		<ant dir="shared" target="${target}"/>
+		<ant dir="asnkernel" target="${target}"/>
+		<ant dir="alarmRmi" target="${target}"/>
+		<ant dir="pdmRmi" target="${target}"/>
+		<ant dir="tmplsinterface" target="${target}"/>
+		<ant dir="images" target="${target}"/>
+		<ant dir="data" target="${target}"/>
+		<ant dir="pen" target="${target}"/>
+		<ant dir="pdm" target="${target}"/>
+		<ant dir="pdm_1_1" target="${target}"/>
+		<ant dir="pdm_1_2" target="${target}"/>
+		<ant dir="pdm_2_0" target="${target}"/>
+		<ant dir="pdm_3_0" target="${target}"/>
+		<ant dir="pdm_4_0" target="${target}"/>
+		<ant dir="pdm_5_0" target="${target}"/>
+		<ant dir="pdm_5_1" target="${target}"/>
+		<ant dir="pdm_6_0" target="${target}"/>
+		<ant dir="pdm_6_1" target="${target}"/>
+		<ant dir="pdm_7_0" target="${target}"/>
+		<ant dir="pdm_7_2" target="${target}"/>
+		<ant dir="pdm_8_1" target="${target}"/>
+		<ant dir="pdm_8_2" target="${target}"/>
+		<ant dir="neaccessRmi" target="${target}"/>
+		<ant dir="bulktransferxsd" target="${target}"/>
+		<ant dir="testclientxsd" target="${target}"/>
+		<ant dir="dmi" target="${target}"/>
+		<ant dir="common" target="${target}"/>
+		<ant dir="schemamapping" target="${target}"/>
+		<ant dir="em" target="${target}"/>
+		<ant dir="pojolayer" target="${target}"/>
+		<ant dir="comms" target="${target}"/>
+		<ant dir="networkdisplayinterface" target="${target}"/>
+		<ant dir="client" target="${target}"/>
+		<ant dir="cccbroker" target="${target}"/>
+		<ant dir="pdmEmulator" target="${target}"/>
+		<ant dir="procman" target="${target}"/>
+		<ant dir="version" target="${target}"/>
+		<ant dir="dbAdmin" target="${target}"/>
+		<ant dir="mplstpRmi" target="${target}"/>
+		<ant dir="cccserver" target="${target}"/>
+		<ant dir="alarm" target="${target}"/>
+		<ant dir="bulktransfer" target="${target}"/>
+		<ant dir="nlstext" target="${target}"/>
+		<ant dir="upgrade" target="${target}"/>
+		<ant dir="maintenance" target="${target}"/>
+		<ant dir="mv36sim" target="${target}"/>
+		<ant dir="soesaSimRmi" target="${target}"/>
+		<ant dir="soesasim" target="${target}"/>
+	</target>
+		
+	<target name="static-analysis-check" description="Perform static analysis check on source code in the work package">
+		<property name="output.file" value="static-analysis.txt" />
+
+		<tempfile property="changeset.file" prefix="changeset" suffix=".log" deleteonexit="true" />
+    <antcall target="changeset"/>
+
+		<echo message="Changed files:${line.separator}" file="${output.file}" />
+		<concat destfile="${output.file}" append="true">
+			<fileset file="${changeset.file}" />
+		</concat>
+		<echo message="${line.separator}-------------------${line.separator}" file="${output.file}" append="true" />
+
+
+		<!-- PMD -->
+		<property name="pmd.output.file" location="${basedir}/pmd-check.txt" />
+		<delete file="${pmd.output.file}" />
+
+		<fileset id="pmd.fileset" dir="${root.dir}" includesfile="${changeset.file}">
+			<filename name="**/*.java" />
+			<!-- exclude test sources -->
+			<filename name="**/test/**" negate="true" />
+			<filename name="**/*Test.java" negate="true" />
+		</fileset>
+
+		<condition property="pmd.skip">
+			<resourcecount refid="pmd.fileset" count="0" />
+		</condition>
+		<antcall target="pmd">
+			<propertyset>
+				<propertyref name="pmd.skip" />
+				<propertyref name="pmd.output.file" />
+			</propertyset>
+			<reference refid="pmd.fileset" />
+		</antcall>
+
+		<echo message="PMD Results:${line.separator}" file="${output.file}" append="true" />
+		<concat destfile="${output.file}" append="true">
+			<fileset file="${pmd.output.file}" />
+		</concat>
+		<echo message="${line.separator}-------------------${line.separator}" file="${output.file}" append="true" />
+
+		<!-- UI STATIC ANALYSIS -->
+		<property name="ui.check.output.file" location="${basedir}/ui-check.txt" />
+		<delete file="${ui.check.output.file}" />
+		<echo message="Running UI STATIC ANALYSIS..." />
+		<fileset id="ui.check.fileset" dir="${root.dir}" includesfile="${changeset.file}" />
+		<condition property="ui.check.skip">
+			<resourcecount refid="ui.check.fileset" count="0" />
+		</condition>
+
+		<ant dir="nsm/scripts/tools/ui_static_analysis" target="check" inheritAll="false">
+			<propertyset>
+				<propertyref name="ui.check.skip" />
+				<propertyref name="ui.check.output.file" />
+			</propertyset>
+			<reference refid="ui.check.fileset" />
+		</ant>
+
+		<echo message="UI Static Analysis Results:${line.separator}${line.separator}" file="${output.file}" append="true" />
+		<concat destfile="${output.file}" append="true">
+			<fileset file="${ui.check.output.file}" />
+		</concat>
+
+		<echo message="${line.separator}-------------------${line.separator}" file="${output.file}" append="true" />
+
+		<!-- CheckStyle call-->
+                <antcall target="checkstyle" />
+
+	</target>
+
+	<target name="pmd" unless="pmd.skip">
+		<fail unless="pmd.output.file" />
+		<echo message="Running PMD..." />
+		<taskdef name="pmd" classname="net.sourceforge.pmd.ant.PMDTask">
+			<classpath>
+        <fileset dir="${lib.dir}">
+          <include name="pmd/pmd/4.3/*.jar"/>
+          <include name="asm/asm/3.2/*.jar"/>
+          <include name="jaxen/jaxen/1.1.1/*.jar"/>
+        </fileset>
+			</classpath>
+		</taskdef>
+
+		<pmd shortfilenames="true" targetjdk="1.6">
+			<ruleset>${basedir}/pmd-config.xml</ruleset>
+			<formatter type="text" toconsole="true" />
+			<formatter type="text" tofile="${pmd.output.file}" />
+			<fileset refid="pmd.fileset" />
+		</pmd>
+	</target>
+
+	<target name="checkstyle">
+                <property name="checkstyle.output.file" value="checkstyle.txt" />
+		<property name="output.file" value="static-analysis.txt" />
+                <taskdef resource="checkstyletask.properties" classpath="${lib.dir}/org/puppycrawl/tools/checkstyle-all/5.6/checkstyle-5.6-all.jar" />
+		<tempfile property="changeset.file" prefix="changeset" suffix=".log" deleteonexit="true" />
+		<antcall target="changeset"/>
+		<fileset id="checkstyle.fileset" dir="${root.dir}" includesfile="${changeset.file}">
+			<filename name="**/*.java" />
+			<!-- exclude test sources -->
+			<filename name="**/test/**" negate="true" />
+			<filename name="**/*Test.java" negate="true" />
+		</fileset>
+
+		<checkstyle config="./sun_checks.xml" failureProperty="checkstyle.failure" failOnViolation="false">
+			<formatter type="plain" />
+			<formatter type="plain" tofile="${checkstyle.output.file}" />
+			<fileset refid="checkstyle.fileset" />
+		</checkstyle>
+		
+		<echo message="CheckStyle Results:${line.separator}${line.separator}" file="${output.file}" append="true" />
+				<concat destfile="${output.file}" append="true">
+				<fileset file="${checkstyle.output.file}" />
+		</concat>
+		<delete file="${checkstyle.output.file}"/>
+	</target>
+	
+
+	<target name="changeset">
+		<fail unless="changeset.file" />
+    <property name="changeset.args" value=""/>
+		<exec dir="${basedir}" executable="${root.dir}/dev/changeset.sh"
+          output="${changeset.file}" failonerror="true" logerror="true">
+      <arg line="${changeset.args}"/>
+		</exec>
+	</target>
+
+</project>
+

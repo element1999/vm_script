@@ -1,0 +1,9 @@
+#!/bin/bash
+#cd `dirname $0`
+cd $proj
+git rev-parse HEAD > ~/.ibuild/nsm_last_rev
+git rev-parse HEAD > ~/.ibuild/esa_last_rev
+date +%s >> ~/.ibuild/nsm_last_date
+date +%s >> ~/.ibuild/esa_last_date
+#ant clean build
+

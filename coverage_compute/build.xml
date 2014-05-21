@@ -1,0 +1,2254 @@
+<?xml version="1.0"?>
+<!--
+  - Copyright (c) 2012 Ericsson AB.
+  - All rights reserved.
+  -->
+
+<project name="nsm" default="deploy" basedir=".">
+
+  <!-- Give user a chance to override without editing this file or typing -D -->
+  <property file="${basedir}/build.properties"/>
+
+  <import file="build_scratch.xml"/>
+
+  <property name="release.version" value="0.0.0.0"/>
+  <property name="release.rstate" value="R14"/>
+
+  <property name="profile" value="dev"/>
+  <property file="build-${profile}.properties"/>
+
+  <property name="modules.dir" location="${basedir}/.."/>
+  <property file="${modules.dir}/build.properties"/>
+
+  <property name="jboss.app.server.third.party.pkg.dir"
+            value="${lib.dir}/org/jboss/jboss-as/7.1.0.Final"/>
+  <property name="nsm.jboss.archive.path"
+            value="${jboss.app.server.third.party.pkg.dir}/jboss-as-7.1.0.Final.zip"/>
+
+  <!-- set global properties for this build -->
+  <property name="project.name" value="nsm"/>
+  <property name="product.brand" value="IPT-NMS-Packet"/>
+  <property name="src.dir" value="${basedir}/src"/>
+  <property name="src.common.dir" value="${src.dir}/common"/>
+  <property name="src.model.dir" value="${src.dir}/model"/>
+  <property name="src.nbi.dir" value="${src.dir}/nbi"/>
+  <property name="src.cable.nbi.dir" value="${src.dir}/cable-nbi"/>
+  <property name="src.action.dir" value="${src.dir}/action"/>
+  <property name="src.test.dir" value="${src.dir}/test"/>
+  <property name="src.correlation.dir" value="${src.dir}/correlation"/>
+  <property name="resources.dir" value="${basedir}/resources"/>
+  <property name="src.nbi.ssc.dir" value="${resources.dir}/nbi_ssc"/>
+
+  <property name="javascript.test.dir" value="${basedir}/javascript_test"/>
+  <property name="javascript.test.runners" value="${javascript.test.dir}/runners"/>
+  <property name="javascript.test.report.dir" value="${javascript.test.dir}/report"/>
+  <property name="javascript.test.report" value="${javascript.test.report.dir}/report.xml"/>
+  <property name="javascript.test.report.summary" value="${javascript.test.report.dir}/report-summary.properties"/>
+
+  <!-- Help documents configuration -->
+  <property name="nsm.online.help.archive.path"
+            value="${basedir}/help/onlinehelp.zip"/>
+
+  <!-- a few properties to be used in support of creating install and
+     - deployment packages
+     -
+     - A few notes :
+     -    1. Script directory structure is as follows :
+     -              ${basedir}/scripts-|-. (build time)
+     -                                 |- install (run and install time)
+     -                                      |- bin  (scripts)
+     -                                      |- overrides (app server overrides)
+     -                                 |- db (all db related scripts)
+    -->
+  <property name="scripts.dir" value="${basedir}/scripts"
+            description="Ref to base scripts directory in repository"/>
+  <property name="install.scripts.dir" value="${scripts.dir}/install"
+            description="Ref to scripts that are required at runtime"/>
+  <property name="bin.install.scripts.dir" value="${install.scripts.dir}/bin"/>
+  <property name="overrides.install.script.dir" value="${install.scripts.dir}/overrides"
+            description="Application server files to be overwritten"/>
+  <property name="db.scripts.dir" value="${scripts.dir}/db"/>
+  <property name="nsm.db.scripts.dir" value="${db.scripts.dir}/nsm"/>
+  <property name="admin.db.scripts.dir" value="${db.scripts.dir}/admin"/>
+  <property name="maintenance.db.scripts.dir" value="${db.scripts.dir}/maintenance"/>
+  <property name="packageconfig.dir" value="${basedir}/pkgcfg"/>
+  <property name="packet.scripts.dir" value="${scripts.dir}/packet"/>
+
+  <!-- Schema updater properties -->
+  <patternset id="schema.updater.package.path">
+    <include name="com/redback/db/**"/>
+    <include name="com/ericsson/db/**"/>
+  </patternset>
+  <property name="webservice.package.path" value="com/ericsson/netop/nsm/"/>
+  <property name="schema.updater.jar.name" value="rbak-updateschema"/>
+  <property name="schema.updater.third.party.jar.name"
+            value="tp-${schema.updater.jar.name}"/>
+	
+  <!-- Security jar name -->
+  <property name="security.engine.jar.name" value="security-engine.jar"/>
+  <property name="security.customize.login.jar.name" value="customized-login.jar"/>
+
+  <!-- EJB Jar Names -->
+  <property name="model.jar.name"
+            value="${project.name}-model.jar"/>
+  <property name="action.jar.name"
+            value="${project.name}-action.jar"/>
+  <property name="nbi.jar.name"
+            value="${project.name}-nbi.jar"/>
+
+  <!-- Build generated directories -->
+  <property name="explodedarchives.dir" value="${basedir}/exploded-archives"/>
+  <property name="ear.dir" value="${explodedarchives.dir}/${project.name}.ear"/>
+  <property name="war.dir" value="${explodedarchives.dir}/${project.name}.war"/>
+  <property name="model.jar.dir" value="${explodedarchives.dir}/${model.jar.name}"/>
+  <property name="action.jar.dir" value="${war.dir}/WEB-INF/classes"/>
+  <property name="nbi.jar.dir" value="${model.jar.dir}"/>
+  <property name="nbi.client.name" value="iptnms-packet-nbi-${release.version}.zip"/>
+  <property name="nbi.dir" value="${explodedarchives.dir}/${nbi.client.name}"/>
+  <property name="branded_nbi.dir.name" value="branded_nbi_zip"/>
+  <property name="tools.dir" value="${explodedarchives.dir}/tools"/>
+  <property name="dist.dir" value="${basedir}/dist"/>
+  <property name="test.dir" value="${basedir}/test"/>
+  <property name="test.class.dir" value="${test.dir}/class"/>
+  <property name="test.report.dir" value="${test.dir}/report"/>
+  <property name="test.report.coverage.dir" location="${test.report.dir}/coverage"/>
+  <property name="test.coverage.datafile" location="${test.dir}/jacoco.exec"/>
+  <property name="target.dir" location="${basedir}/target"/>
+  <property name="pmd.report.txt.file" location="${target.dir}/pmd-report.txt"/>
+  <property name="bootstrap.dir" value="${basedir}/bootstrap"/>
+  <property name="nbi.ssc.jar.name" value="nsm-nbi-ssc.jar"/>
+  <property name="detach.tool.name" value="detach-service.zip"/>
+
+  <!-- Sonar properties -->
+  <property file="${modules.dir}/sonar.properties"/>
+  <property name="sonar.projectKey" value="com.ericsson.iptnms:packet-nsm:${branch}"/>
+  <property name="sonar.sources" value="${src.common.dir},${src.model.dir},${src.nbi.dir},${src.cable.nbi.dir},${src.action.dir}"/>
+  <property name="sonar.binaries" value="${model.jar.dir},${action.jar.dir}"/>
+  <property name="sonar.dynamicAnalysis" value="reuseReports"/>
+  <property name="sonar.surefire.reportsPath" value="${test.report.dir}"/>
+  <property name="sonar.core.codeCoveragePlugin" value="jacoco"/>
+  <property name="sonar.jacoco.reportPath" value="${test.coverage.datafile}"/>
+
+  <!-- Packaging-related properties -->
+  <property name="nsm.jboss.app.server.name" value="jboss"/>
+  <property name="nsm.jboss.app.server.pkg.name"
+            value="RBAK${nsm.jboss.app.server.name}"/>
+  <property name="production.unix.user" value="netop"/>
+  <property name="production.unix.group" value="netop"/>
+  <property name="cable.client.archive.name"
+            value="${project.name}-cable-client-${release.version}"/>
+  <property name="application.name" value="IPT NMS-Packet"/>
+
+  <!-- Replacement tokens -->
+  <property name="release.version.token" value="RELEASE_VERSION"/>
+  <property name="netop.release.token" value="NETOP_RELEASE"/>
+  <property name="release.rstate.token" value="RELEASE_RSTATE"/>
+  <property name="project.name.token" value="PROJECT_NAME"/>
+  <property name="current.year.token" value="CURRENT_YEAR"/>
+  <property name="build.java.version.token" value="JAVA_VERSION"/>
+  <property name="schema.updater.jar.token" value="SCHEMA_UPDATER_JAR"/>
+  <property name="default.app.server.overrides.archive.name.token"
+            value="APP_SRV_OVERRIDE"/>
+  <property name="default.app.server.pkg.name.token" value="APP_SRV_PKG_NAME"/>
+  <property name="default.app.server.versioned.name.token"
+            value="APP_SRV_VERSIONED_NAME"/>
+  <property name="default.app.server.version.token" value="APP_SRV_VERSION"/>
+  <property name="production.unix.user.token" value="NSM_USER"/>
+  <property name="application.name.token" value="APPLICATION_NAME"/>
+  <property name="jboss.archive.path.token"
+            value="THIRD_PARTY_ARCHIVE"/>
+  <property name="jboss.current.version.token" value="JBOSS_VERSION"/>
+  <property name="seam.debug.token" value="SEAM_DEBUG"/>
+  <property name="jndi.pattern.token" value="JNDI_PATTERN"/>
+  <property name="jsf.project.stage.token" value="JSF_PROJECT_STAGE"/>
+
+  <!-- JBoss configuration/packaging-related properties -->
+  <property name="jboss.current.version" value="7.1.0.Final"/>
+  <property name="jboss.app.server.archive.path"
+            value="${nsm.jboss.archive.path}"/>
+  <property name="jboss.rpm.name"
+            value="iptnms-packet-${nsm.jboss.app.server.name}-${jboss.current.version}-jee6.i586.rpm"/>
+
+  <!-- Application server packaging properties -->
+  <property name="default.app.server.version" value="${jboss.current.version}"/>
+  <property name="default.app.server.name"
+            value="${nsm.jboss.app.server.name}"/>
+  <property name="default.app.server.overrides.archive.name"
+            value="asOverrides_${default.app.server.name}-${default.app.server.version}"/>
+  <property name="default.app.server.rpm.name" value="${jboss.rpm.name}"/>
+
+  <!-- Generated RPM packaging properties/directories -->
+  <property name="rpmpackage.dir" value="${basedir}/rpm"/>
+  <property name="final.rpm.spec.filename" value="packet.spec"/>
+  <property name="packet.spec.file" value="${scripts.dir}/install/rpm/${final.rpm.spec.filename}"/>
+  <property name="final.rpm.spec.path" value="${rpmpackage.dir}/SPECS/${final.rpm.spec.filename}"/>
+
+  <!-- Generated packaging directories -->
+  <property name="package.dir" value="${basedir}/pkg"/>
+  <property name="raw.package.dir" value="${package.dir}/raw"/>
+  <property name="packed.package.dir" value="${package.dir}/packed"/>
+  <property name="dist.package.dir" value="${package.dir}/dist"/>
+  <property name="jboss.raw.package.dir"
+            value="${raw.package.dir}/${nsm.jboss.app.server.pkg.name}/jboss"/>
+
+  <!-- Deployment directories -->
+  <property name="deploy.dir"
+            value="${jboss.home}/standalone/deployments"/>
+  <property name="ear.deploy.dir" value="${deploy.dir}/${project.name}.ear"/>
+  <property name="war.deploy.dir"
+              value="${ear.deploy.dir}/${project.name}.war"/>
+  <property name="jar.deploy.dir"
+            value="${ear.deploy.dir}/${model.jar.name}"/>
+  <property name="client.jar.deploy.dir"
+            value="${war.deploy.dir}/WEB-INF/classes"/>
+  <property name="nbi.jar.deploy.dir"
+            value="${ear.deploy.dir}/${nbi.jar.name}"/>
+  <property name="reports.war.dir.name" value="reports.war"/>
+  <property name="reports.war.deploy.dir"
+            value="${deploy.dir}/${reports.war.dir.name}"/>
+  <property name="javac.debug" value="true"/>
+  <property name="javac.deprecation" value="false"/>
+  <property name="seam.debug" value="true"/>
+  <property name="jsf.project.stage.development" value="Development"
+            description="Setting JSF project stage to this value makes troubleshooting much easier"/>
+  <property name="jsf.project.stage" value="${jsf.project.stage.development}"/>
+  <property name="test.summary.print" value="false"/>
+  <property name="test.failonerror" value="true"/>
+  <property name="test.coverage.enabled" value="true"/>
+	
+  <!-- Upgrade toolkit package --> 
+  <property name="upgrade.scripts.root.dir" value="${basedir}/scripts" />
+  <property name="upgrade.scripts.dir.name" value="upgrade" />
+  <property name="upgrade.scripts.dir.in.tar" value="iptnms-upgrade-toolkit" />
+  <property name="upgrade.toolkit.tar" value="${upgrade.scripts.dir.in.tar}-${release.version}.tar"/>
+
+  <!--Properties for validating configuration files -->
+  <property name="validate.resources.dir" value="${explodedarchives.dir}"/>
+  <property name="schema.dir" value="${explodedarchives.dir}/schemas"/>
+  <property name="src.schema.dir" value="${schema.dir}/org/jboss/seam"/>
+  <property name="schema.version" value="2.0"/>
+
+  <property name="work.dir" value="${basedir}/work" />
+  <property name="build.log4j.file" location="${basedir}/log4j.properties"/>
+
+  <path id="jre.libs" description="Java runtime libraries">
+    <pathelement location="${java.home}/lib"/>
+  </path>
+
+  <fileset id="lib" dir="${lib.dir}" includesfile="classpath.list"/>
+  <fileset id="oracle.lib" dir="${lib.dir}">
+    <include name="com/oracle/ojdbc14/10.2.0.1.0/*.jar"/>
+  </fileset>
+  <fileset id="postgres.lib" dir="${lib.dir}">
+    <include name="postgresql/postgresql/9.0-801.jdbc4/*.zip"/>
+  </fileset>
+  <fileset id="hibernate.lib" dir="${lib.dir}" includesfile="hibernate.list"/>
+  <fileset id="schema.updater.third.party.lib" dir="${lib.dir}">
+    <include name="oro/oro/2.0.8/*.jar"/>
+    <include name="log4j/log4j/1.2.16/*.jar"/>
+    <include name="org/jibx/jibx-bind/1.1.6a/*.jar"/>
+    <include name="org/jibx/jibx-extras/1.1.6a/*.jar"/>
+    <include name="org/jibx/jibx-run/1.1.6a/*.jar"/>
+  </fileset>
+  <fileset id="jacorb.lib" dir="${lib.dir}">
+    <include name="avalon-framework/avalon-framework/4.1.5/*.jar"/>
+    <include name="org/jacorb/jacorb/2.2.3/*.jar"/>
+    <include name="logkit/logkit/1.2/*.jar"/>
+  </fileset>
+  <fileset id="jlima.lib" dir="${lib.dir}">
+    <include name="com/marconi/jlima/1.2.7/*.jar"/>
+  </fileset>
+  <fileset id="xstream.lib" dir="${lib.dir}">
+    <include name="com/thoughtworks/xstream/xstream/1.1.1/*.jar" />
+  </fileset>
+  <fileset id="jibx.binding.files"
+           dir="${src.model.dir}/com/redback/nsm/webservice/mapping/bindings/">
+    <include name="**/*.xml"/>
+  </fileset>
+  <fileset id="asn.lib" dir="${modules.dir}/asnkernel/jar">
+    <include name="asnkernel.jar" />
+  </fileset>
+  <fileset id="lm.lib" dir="${modules.dir}/license/lib">
+    <include name="LM.jar" />
+  </fileset>
+
+
+  <patternset id="legacy.test.files">
+    <include name="com/redback/nsm/HelloWorldTest.*"/>
+    <include name="com/redback/nsm/core/entities/NsmEntityManagerTester.*"/>
+    <include name="com/redback/nsm/core/entities/NsmEntityManagerTesterClient.*"/>
+    <include name="com/redback/nsm/core/entities/NsmEntityManagerTesterImpl.*"/>
+    <include name="com/redback/nsm/customer/test/CustomerTest.*"/>
+    <include name="com/redback/nsm/fault/manager/FaultManagementPropertiesTest.*"/>
+    <include name="com/redback/nsm/fault/manager/FaultNotificationManagerTest.*"/>
+    <include name="com/redback/nsm/fault/manager/ServiceFaultUpdateIdCriteriaTest.*"/>
+    <include name="com/redback/nsm/fault/manager/ServiceFaultUpdateSearchCriteriaTest.*"/>
+    <include name="com/redback/nsm/network/ted/TestTED.*"/>
+    <include name="com/redback/nsm/network/ted/TestTedBean.*"/>
+    <include name="com/redback/nsm/security/login/http/TestLogin.*"/>
+    <include name="com/redback/nsm/service/ces/TestCesServiceBuilder.*"/>
+    <include name="com/redback/nsm/service/ces/TestCesServiceBuilderBean.*"/>
+    <include name="com/redback/nsm/service/discovery/eth/TestServiceDiscovery.*"/>
+    <include name="com/redback/nsm/service/discovery/eth/TestServiceDiscoveryBean.*"/>
+    <include name="com/redback/nsm/service/mplstp/entities/TestMplsTp.*"/>
+    <include name="com/redback/nsm/service/mplstp/entities/TestMplsTpBean.*"/>
+    <include name="com/redback/nsm/service/mplstp/TestAlarmServer.*"/>
+    <include name="com/redback/nsm/template/test/CLITemplateTest.*"/>
+  </patternset>
+
+  <path id="build.classpath">
+    <fileset refid="lib"/>
+    <fileset refid="hibernate.lib"/>
+    <fileset refid="jlima.lib"/>
+    <fileset refid="xstream.lib" />
+    <fileset refid="asn.lib"/>
+    <fileset refid="lm.lib"/>
+    <fileset dir="${lib.dir}">
+      <includesfile name="seam.list"/>
+      <includesfile name="resteasy.list"/>
+    </fileset>
+    <pathelement location="${dist.dir}/log4j-configuration.jar"/>
+  </path>
+
+  <fileset id="esa.server.jars" dir="${modules.dir}">
+    <include name="alarmRmi/jar/alarmRmi.jar"/>
+    <include name="client/jar/client.jar"/>
+    <include name="common/jar/common.jar"/>
+    <include name="dmi/jar/dmi.jar"/>
+    <include name="pdm/jar/pdm.jar"/>
+    <include name="mplstpRmi/jar/mplstpRmi.jar"/>
+    <include name="neaccessRmi/jar/neaccessRmi.jar"/>
+    <include name="networkdisplayinterface/jar/networkdisplayinterface.jar"/>
+    <include name="nlstext/jar/nlstext.jar"/>
+    <include name="schemamapping/jar/schemamapping.jar"/>
+    <include name="foundation/jar/foundation.jar"/>
+    <include name="shared/jar/shared-tmfnbi3.jar"/>
+  </fileset>
+  <fileset id="esa.client.jars" dir="${modules.dir}/mv38_nui_dev/ccc/RUNTIME/lib">
+    <include name="arch.jar"/>
+    <include name="ccc.jar"/>
+    <include name="nm.jar"/>
+    <include name="resources.jar"/>
+  </fileset>
+  <fileset id="esa.cccserver.jars" dir="${modules.dir}/cccserver/jar">
+    <include name="cccserver.jar" />
+  </fileset>
+  <path id="esa.dependencies.classpath">
+    <fileset refid="esa.server.jars"/>
+    <fileset refid="esa.client.jars"/>
+    <fileset refid="esa.cccserver.jars" />
+  </path>
+
+  <fileset id="nsm.esa.server.jars" dir="${modules.dir}">
+    <include name="common/jar/common.jar"/>
+    <include name="schemamapping/jar/schemamapping.jar"/>
+  </fileset>
+
+  <path id="schema.updater.build.classpath">
+    <fileset refid="oracle.lib"/>
+    <fileset refid="postgres.lib"/>
+    <fileset refid="hibernate.lib"/>
+    <fileset refid="schema.updater.third.party.lib"/>
+    <fileset refid="nsm.esa.server.jars" />
+  </path>
+
+  <path id="jibx.build.classpath">
+    <fileset dir="${lib.dir}">
+      <include name="org/jibx/jibx-bind/1.1.6a/*.jar"/>
+      <include name="org/jibx/jibx-extras/1.1.6a/*.jar"/>
+      <include name="org/jibx/jibx-run/1.1.6a/*.jar"/>
+      <include name="bcel/bcel/5.1/*.jar"/>
+    </fileset>
+  </path>
+
+  <taskdef name="xmltask" classname="com.oopsconsultancy.xmltask.ant.XmlTask">
+    <classpath>
+      <fileset dir="${lib.dir}" includes="com/oopsconsultancy/xmltask/xmltask/1.16.1/*.jar"/>
+    </classpath>
+  </taskdef>
+
+  <tstamp>
+    <format property="start.timestamp" pattern="dd-MMM-yy HH:mm:ss" />
+  </tstamp>
+
+
+  <target name="init" description="Initialize the build">
+    <echo message="Build Time Stamp: ${start.timestamp}" />
+    <antcall target="link-to-scratch" inheritAll="false">
+      <param name="rbak.tools.link.work" value="${explodedarchives.dir}"/>
+    </antcall>
+    <antcall target="link-to-scratch" inheritAll="false">
+      <param name="rbak.tools.link.work" value="${dist.dir}"/>
+    </antcall>
+    <mkdir dir="${model.jar.dir}"/>
+    <mkdir dir="${action.jar.dir}"/>
+    <mkdir dir="${ear.dir}"/>
+    <mkdir dir="${war.dir}"/>
+    <mkdir dir="${nbi.jar.dir}"/>
+    <mkdir dir="${nbi.dir}"/>
+    <copy todir="${dist.dir}">
+      	<fileset refid="lm.lib"/>  	
+    </copy>
+  </target>
+
+  <target name="jar-log4j-config">
+    <jar destfile="${dist.dir}/log4j-configuration.jar">
+      <fileset dir="${basedir}">
+        <include name="log4j.properties"/>
+      </fileset>
+    </jar>
+  </target>
+  <target name="compile" depends="compile-model, compile-action, compile-nbi"
+          description="Compile the Java source code" unless="eclipse.running">
+  </target>
+
+  <target name="compile-model" depends="init"
+          description="Compiles the IPT NMS Server Tier (Model) source code"
+          unless="eclipse.running">
+    <javac bootclasspathref="jre.libs" includeJavaRuntime="yes"
+           destdir="${model.jar.dir}" debug="${javac.debug}"
+           deprecation="${javac.deprecation}" nowarn="on"
+           srcdir="${src.model.dir}">
+      <classpath>
+        <path refid="build.classpath"/>
+        <path refid="esa.dependencies.classpath"/>
+      </classpath>
+      <src path="${src.common.dir}"/>
+      <src path="${src.model.dir}"/>
+    	<patternset>
+        <invert>
+          <patternset refid="schema.updater.package.path"/>
+        </invert>
+      </patternset>
+    </javac>
+  </target>
+
+  <target name="compile-action" depends="init"
+          description="Compiles the IPT NMS Client Tier (Action) source code"
+          unless="eclipse.running">
+    <javac bootclasspathref="jre.libs" includeJavaRuntime="yes"
+           classpathref="build.classpath" destdir="${action.jar.dir}"
+           debug="${javac.debug}" deprecation="${javac.deprecation}"
+           nowarn="on" srcdir="${src.action.dir}">
+      <classpath>
+        <path refid="build.classpath"/>
+        <pathelement path="${model.jar.dir}"/>
+        <path refid="esa.dependencies.classpath"/>
+      </classpath>
+    </javac>
+  </target>
+
+  <target name="compile-nbi" depends="init" unless="build.no.nbi"
+          description="Compiles IPT NMS' Cable/Wifi and Service Design NBIs">
+    <javac bootclasspathref="jre.libs" includeJavaRuntime="yes"
+           classpathref="build.classpath" destdir="${nbi.jar.dir}"
+           debug="${javac.debug}" deprecation="${javac.deprecation}"
+           nowarn="on">
+      <classpath >
+        <path refid="build.classpath"/>
+      	<path refid="esa.dependencies.classpath"/>
+        <pathelement path="${model.jar.dir}"/>
+        <pathelement location="${modules.dir}/foundation/jar/foundation.jar"/>
+        <pathelement location="${modules.dir}/shared/jar/shared-tmfnbi3.jar"/>
+      </classpath>
+      <src path="${src.nbi.dir}"/>
+      <src path="${src.cable.nbi.dir}"/>
+    </javac>
+  </target>
+
+  <target name="jar" depends="compile, nsm-jar, security-jar, client-jar, nbi-jar"
+          description="Build the set of NSM EJB-JAR files">
+  </target>
+
+  <target name="nsm-jar" depends="compile-model"
+          description="Build the distribution .jar file">
+    <copy todir="${model.jar.dir}">
+      <fileset dir="${resources.dir}">
+        <include name="seam.properties"/>
+        <include name="seam.quartz.properties"/>
+        <include name="*.drl"/>
+        <include name="initial_jobs.properties"/>
+        <include name="nodeTypes.properties"/>
+        <include name="virtualNodes.properties"/>
+        <include name="MaintenanceEntity.properties"/>
+        <include name="defaultValues.properties"/>
+      	<include name="genericUpdateImpactAnalyzer.properties"/>
+        <include name="ted-ehcache.xml"/>
+        <include name="${src.model.dir}/rebel.xml"/>
+      </fileset>
+    </copy>
+    <copy todir="${model.jar.dir}/com/ericsson/netop/nsm/webservice">
+      <fileset dir="${resources.dir}" includes="handlers.xml"/>
+    </copy>
+
+    <copy todir="${model.jar.dir}/com/ericsson/nsm/service/discovery/l3vpn/xmlmodel">
+      <fileset dir="${src.model.dir}/com/ericsson/nsm/service/discovery/l3vpn/xmlmodel" includes="**/*.xsd"/>
+    </copy>
+  	
+    <tstamp><format property="current.year" pattern="yyyy"/></tstamp>
+    <copy todir="${model.jar.dir}">
+      <fileset dir="${resources.dir}">
+        <include name="messages*.properties"/>
+        <include name="application*.properties"/>
+        <include name="ValidationMessages*.properties"/>
+        <include name="error*.properties"/>
+        <include name="deviceResource*.properties"/>
+      </fileset>
+      <filterset>
+        <filter token="${current.year.token}" value="${current.year}"/>
+        <filter token="${netop.release.token}" value="${release.version}"/>
+        <filter token="${release.rstate.token}" value="${release.rstate}"/>
+      </filterset>
+    </copy>
+
+    <copy todir="${model.jar.dir}/META-INF">
+      <fileset dir="${resources.dir}/META-INF">
+        <!--include name="jboss.xml"/-->
+
+        <include name="ejb-jar.xml"/>
+      </fileset>
+    </copy>
+  	<copy todir="${model.jar.dir}">
+  	      <fileset dir="${resources.dir}">
+          	<include name="jndi.properties"/>
+  	        <include name="tmfnbi3-product.properties"/>
+  	      </fileset>
+  	</copy>
+    <copy tofile="${model.jar.dir}/META-INF/persistence.xml"
+          file="${resources.dir}/META-INF/persistence-${profile}.xml"
+          overwrite="true"/>
+    <copy tofile="${model.jar.dir}/import.sql"
+          file="${resources.dir}/import-${profile}.sql" overwrite="true"/>
+    <copy todir="${model.jar.dir}/img" file="${basedir}/view/img/ericsson_logo.png"/>
+  </target>
+	
+  <target name="security-jar" depends="compile-model" description="Build the distribution .jar file" >
+    <jar destfile="${dist.dir}/${security.engine.jar.name}">
+      <fileset dir="${model.jar.dir}">
+        <include name="com/redback/nsm/security/PasswordEncryptEngine.class"/>
+      	<include name="com/redback/nsm/security/AESPassphrase.class" />
+      </fileset>
+      <manifest>
+        <attribute name="Main-Class" value="com.redback.nsm.security.PasswordEncryptEngine"/>
+      </manifest>
+    </jar>
+    <jar destfile="${dist.dir}/${security.customize.login.jar.name}">
+      <fileset dir="${model.jar.dir}">
+        <include name="org/picketbox/datasource/security/DataSourceCustomizedLoginModule.class"/>
+      </fileset>
+    </jar>
+  </target>
+
+  <target name="nbi-jar" depends="compile-nbi" unless="build.no.nbi"
+          description="Build the distribution .jar file">
+    <copy todir="${nbi.jar.dir}">
+      <fileset dir="${resources.dir}">
+        <include name="seam.properties"/>
+        <include name="handlers.xml"/>
+      </fileset>
+    </copy>
+    <copy todir="${nbi.jar.dir}/META-INF">
+      <fileset dir="${resources.dir}/META-INF">
+        <include name="jboss.xml"/>
+        <include name="packet-jaxws-endpoint-config.xml"/>
+      </fileset>
+    </copy>
+    <copy tofile="${action.jar.dir}/META-INF/ejb-jar.xml"
+          file="${resources.dir}/META-INF/ejb-client-jar.xml"/>
+    <jar jarfile="${nbi.jar.dir}/${nbi.ssc.jar.name}" basedir="${src.nbi.ssc.dir}">
+      <include name="**/*.xml"/>
+    </jar>
+    <antcall target="wsprovide"/>
+  </target>
+
+  <target name="client-jar" depends="compile-action"
+          description="Build the client distribution .jar file">
+    <copy todir="${action.jar.dir}">
+      <fileset dir="${resources.dir}">
+        <include name="seam.properties"/>
+        <include name="rebel.xml"/>
+      </fileset>
+    </copy>
+    <copy tofile="${action.jar.dir}/META-INF/ejb-jar.xml"
+          file="${resources.dir}/META-INF/ejb-client-jar.xml"/>
+
+    <copy todir="${action.jar.dir}/img"
+          file="${basedir}/view/img/ericsson_logo.png"/>
+    <manifest file="${action.jar.dir}/META-INF/MANIFEST.MF">
+      <attribute name="Built-By" value="IPT NMS"/>
+      <section name="IPT NMS Client">
+        <attribute name="Specification-Vendor" value="Ericsson"/>
+        <attribute name="Implementation-Title" value="IPT NMS Client"/>
+      </section>
+    </manifest>
+  </target>
+
+  <target name="init-wsprovide" depends="jar-log4j-config">
+    <taskdef name="wsprovide" classname="org.jboss.ws.tools.ant.WSProvideTask">
+      <classpath>
+        <fileset dir="${lib.dir}" includesfile="wsprovide.list"/>
+      </classpath>
+    </taskdef>
+  </target>
+
+  <target name="wsprovide" depends="init-wsprovide, compile">
+    <mkdir dir="${model.jar.dir}/META-INF/wsdl"/>
+    <echo>Building NSM Web Services client at ${nbi.dir}</echo>
+    <!-- Build the MtosiServiceActivationInterface WSDL -->
+    <wsprovide fork="false"
+               destdir="${nbi.dir}/java/bin"
+               genwsdl="true"
+               keep="true"
+               resourcedestdir="${nbi.dir}/wsdl"
+               sourcedestdir="${nbi.dir}/java/src"
+               sei="com.ericsson.nsm.webservice.mtosi.MtosiServiceActivationInterface">
+      <!-- TODO: consider refactoring classpath out to remove redundancy -->
+      <classpath>
+      	<!--  <path refid="build.classpath"/> -->
+        <pathelement path="${nbi.jar.dir}"/>
+        <pathelement path="${model.jar.dir}"/>
+        <pathelement location="${modules.dir}/foundation/jar/foundation.jar"/>
+      </classpath>
+      </wsprovide>
+      <!-- Build the MtosiManageServiceInventory WSDL -->
+      <wsprovide fork="false"
+                 destdir="${nbi.dir}/java/bin"
+                 genwsdl="true"
+                 keep="true"
+                 resourcedestdir="${nbi.dir}/wsdl"
+                 sourcedestdir="${nbi.dir}/java/src"
+                 sei="com.ericsson.nsm.webservice.mtosi.MtosiManageServiceInventory">
+          <classpath>
+        	<!--  <path refid="build.classpath"/> -->
+               <pathelement path="${nbi.jar.dir}"/>
+              <pathelement path="${model.jar.dir}"/>
+              <pathelement location="${modules.dir}/foundation/jar/foundation.jar"/>
+          </classpath>
+      </wsprovide>
+      <!-- Build the NSM Customer WSDL -->
+      <wsprovide fork="false"
+                 destdir="${nbi.dir}/java/bin"
+                 genwsdl="true"
+                 keep="true"
+                 resourcedestdir="${nbi.dir}/wsdl"
+                 sourcedestdir="${nbi.dir}/java/src"
+                 sei="com.ericsson.nsm.webservice.customer.NsmCustomerWs">
+          <classpath>
+        	<!--  <path refid="build.classpath"/> -->
+               <pathelement path="${nbi.jar.dir}"/>
+              <pathelement path="${model.jar.dir}"/>
+              <pathelement location="${modules.dir}/foundation/jar/foundation.jar"/>
+          </classpath>
+      </wsprovide>
+
+      <!-- get rid of the generated java source and classes, they're not useful -->
+      <delete dir="${nbi.dir}/java"/>
+      <echo>Copying static WebService definitons (.wsdl) to ${ear.dir}/META-INF/wsdl</echo>
+      <copy todir="${model.jar.dir}/META-INF/wsdl">
+          <fileset  dir="${nbi.dir}/wsdl" includes="**/*.wsdl"/>
+      </copy>
+      <echo>Building NSM Web Services client .zip</echo>
+
+      <!-- apply ${product.brand} to all NBI artifacts -->
+      <antcall target="assemble-nbi-apply-product-brand"/>
+
+      <zip destfile="${dist.dir}/${nbi.client.name}"
+           basedir="${nbi.dir}/${branded_nbi.dir.name}"
+           includes="**/*"/>
+  </target>
+
+  <target name="assemble-nbi-apply-product-brand"
+          description="apply IPT-NMS-Packet brand to NBI customer artifacts and assemble into a zip">
+    <property name="service-nbi-filename-pattern" value="Mtosi*"/>
+    <xslt basedir="${nbi.dir}/wsdl" destdir="${nbi.dir}/${branded_nbi.dir.name}/wsdl"
+          style="${resources.dir}/apply-brand-ipt-nms-packet-nbi.xsl"
+          includes="**/${service-nbi-filename-pattern}">
+      <mapper type="glob" from="${service-nbi-filename-pattern}"
+              to="${product.brand}-*"/>
+    </xslt>
+
+    <property name="customer-nbi-filename-pattern" value="Nsm*"/>
+    <xslt basedir="${nbi.dir}/wsdl" destdir="${nbi.dir}/${branded_nbi.dir.name}/wsdl"
+          style="${resources.dir}/apply-brand-ipt-nms-packet-nbi.xsl"
+          includes="**/${customer-nbi-filename-pattern}">
+      <mapper type="glob" from="${customer-nbi-filename-pattern}"
+              to="${product.brand}-*"/>
+    </xslt>
+
+    <property name="bulk-transfer-nbi-filename" value="CCCBulkTransfer.xsd"/>
+    <xslt basedir="${modules.dir}/bulktransferxsd/xsd" destdir="${nbi.dir}/${branded_nbi.dir.name}/xsd"
+          style="${resources.dir}/apply-brand-ipt-nms-packet-nbi.xsl"
+          includes="**/${bulk-transfer-nbi-filename}">
+      <mapper type="glob" from="${bulk-transfer-nbi-filename}"
+              to="*${product.brand}-BulkTransfer.xsd"/>
+    </xslt>
+
+    <property name="ericsson-top-mib-filename" value="ERICSSON-TOP-MIB"/>
+    <property name="iptnms-services-mib-filename" value="IPTNMS-SERVICES-MIB"/>
+    <copy todir="${nbi.dir}/${branded_nbi.dir.name}/mib">
+      <fileset dir="${resources.dir}/mibs">
+        <include name="${ericsson-top-mib-filename}"/>
+        <include name="${iptnms-services-mib-filename}"/>
+      </fileset>
+    </copy>
+    <!-- customer-visible:  remove the CVS "$Id ... $" string -->
+    <replaceregexp file="${nbi.dir}/${branded_nbi.dir.name}/mib/${ericsson-top-mib-filename}"
+                   match="\$I.: .*\$$" replace="" byline="true"/>
+    <replaceregexp file="${nbi.dir}/${branded_nbi.dir.name}/mib/${iptnms-services-mib-filename}"
+                   match="\$I.: .*\$$" replace="" byline="true"/>
+  </target>
+
+  <target name="war" depends="client-jar, include-help, assemble-resources"
+          description="Build the distribution .war file">
+    <copy todir="${war.dir}">
+      <fileset dir="${basedir}/view"/>
+    </copy>
+    <copy todir="${war.dir}/WEB-INF">
+      <fileset dir="${resources.dir}/WEB-INF">
+        <include name="*.*"/>
+        <include name="facelets/**/*.*"/>
+        <include name="classes/**/*.*"/>
+        <exclude name="classes/**/*.class"/>
+      </fileset>
+      <filterset>
+        <filter token="${seam.debug.token}" value="${seam.debug}"/>
+        <filter token="${jndi.pattern.token}" value="java:global/${project.name}/${project.name}-model/#{ejbName}"/>
+        <filter token="${jsf.project.stage.token}" value="${jsf.project.stage}"/>
+      </filterset>
+    </copy>
+
+    <!-- TODO: There are no such folders (lib and classes) under ${resources.dir}/WEB-INF. -->
+    <copy todir="${war.dir}/WEB-INF">
+      <fileset dir="${resources.dir}/WEB-INF">
+        <include name="lib/*.*"/>
+        <include name="classes/**/*.class"/>
+      </fileset>
+    </copy>
+
+    <copy todir="${war.dir}/WEB-INF/classes/META-INF">
+      <fileset dir="${resources.dir}/META-INF">
+      	<include name="skins/*.*"/>
+        <include name="richfaces/*.*" />
+      </fileset>
+    </copy>
+    <copy todir="${war.dir}/WEB-INF/lib" flatten="true">
+      <fileset dir="${lib.dir}" includesfile="deployed-jars-war.list"/>
+    </copy>
+  </target>
+
+  <target name="ear" description="Build the EAR">
+    <copy todir="${ear.dir}">
+      <fileset dir="${resources.dir}">
+        <include name="*jpdl.xml"/>
+        <include name="*hibernate.cfg.xml"/>
+        <include name="jbpm.cfg.xml"/>
+      </fileset>
+    </copy>
+    <copy todir="${ear.dir}/lib" flatten="true">
+      <fileset dir="${lib.dir}" includesfile="deployed-jars-ear.list"/>
+      <fileset refid="esa.server.jars"/>
+      <fileset refid="esa.client.jars"/>
+      <fileset refid="esa.cccserver.jars" />
+      <fileset dir="${lib.dir}">
+        <include name="commons-net/commons-net/1.3.0/*.jar"/>
+        <include name="javax/help/javahelp/2.0.02/*.jar"/>
+        <include name="com/marconi/jlima/1.2.7/*jar"/>
+        <include name="com/thoughtworks/xstream/xstream/1.1.1/*.jar" />
+      </fileset>
+      <fileset refid="asn.lib"/>
+      <fileset refid="lm.lib"/>
+    </copy>
+    <copy todir="${ear.dir}/META-INF">
+      <fileset dir="${resources.dir}/META-INF">
+        <include name="application.xml"/>
+        <include name="jboss-app.xml"/>
+        <include name="jboss-deployment-structure.xml"/>
+      </fileset>
+    </copy>
+  </target>
+
+  <target name="build-nsm-archive" depends="jar, war, ear, build_reports"
+          description="Package the archives">
+    <jar jarfile="${dist.dir}/${model.jar.name}" basedir="${model.jar.dir}" 
+    	excludes="org/picketbox/datasource/security/DataSourceCustomizedLoginModule.class,com/redback/nsm/security/PasswordEncryptEngine.class" />
+
+    <jar jarfile="${dist.dir}/${project.name}.war" basedir="${war.dir}"/>
+    <jar jarfile="${dist.dir}/${project.name}.ear">
+      <fileset dir="${ear.dir}"/>
+      <fileset dir="${dist.dir}">
+        <include name="${model.jar.name}"/>
+        <include name="${project.name}.war"/>
+      </fileset>
+    </jar>
+  </target>
+
+  <target name="encryptPassword" depends="security-jar"
+	          description="Generate the encrypted password using unified security algorithm.">
+    <fail unless="plain.text">Usage: ant encryptPassword -Dplain.text=example</fail>
+    <echo>Converting plain text password "${plain.text}" to encrypted format below...</echo>
+    <java classname="com.redback.nsm.security.PasswordEncryptEngine" fork="true">
+      <arg value="0"/>
+      <arg value="${plain.text}"/>
+      <classpath>
+        <pathelement location="${dist.dir}/${security.engine.jar.name}"/>
+      </classpath>
+    </java>
+  </target>
+
+  <target name="include-help"
+          description="Extract help files to the deployment help directory">
+    <echo message="Extracting Help files from ${nsm.online.help.archive.path}"/>
+    <unzip src="${nsm.online.help.archive.path}" dest="${war.dir}/help"
+           overwrite="false"/>
+  </target>
+
+  <target name="compile-schema-updater" depends="init"
+          description="Compile the schema updater source code">
+    <javac classpathref="schema.updater.build.classpath" destdir="${model.jar.dir}"
+           debug="${javac.debug}" deprecation="${javac.deprecation}"
+           nowarn="on">
+      <src path="${src.common.dir}"/>
+      <src path="${src.model.dir}" />
+      <src path="${src.nbi.dir}" />
+      <patternset refid="schema.updater.package.path"/>
+    </javac>
+  </target>
+
+  <target name="jar-schema-updater" depends="compile-schema-updater"
+          description="Produce the schema updater and its third party jar files">
+    <jar jarfile="${dist.dir}/${schema.updater.jar.name}.jar"
+         basedir="${model.jar.dir}" includes="**/*.class"/>
+
+    <!-- Create a single third party jar from various jar/zip files -->
+    <!-- TODO: kteng - create manifest with proper copyright from all third
+         TODO: party jars? -->
+    <!-- TODO: kteng - may need use an uptodate property so that we don't
+         TODO: build this jar every time -->
+    <jar jarfile="${dist.dir}/${schema.updater.third.party.jar.name}.jar">
+      <zipgroupfileset refid="schema.updater.third.party.lib"/>
+      <zipgroupfileset refid="oracle.lib"/>
+      <zipgroupfileset refid="hibernate.lib"/>
+      <zipgroupfileset refid="postgres.lib"/>
+    </jar>
+  </target>
+
+  <target name="gen-schema-checksum" depends="compile-schema-updater">
+    <java classname="com.ericsson.db.SchemaChecksum" fork="true">
+      <arg value="scripts/db/packet"/>
+      <arg value="scripts/db/packet/schema.md5"/>
+      <classpath>
+        <pathelement location="${model.jar.dir}"/>
+        <path refid="schema.updater.build.classpath"/>
+      </classpath>
+    </java>
+  </target>
+
+  <target name="update-schema" description="Update the database schema"
+          depends="compile-schema-updater,gen-schema-checksum">
+    <property name="db.url" value="jdbc:postgresql://localhost:5432/CCCdata"/>
+    <property name="db.system.password" value="ericsson"/>
+    <property name="db.user.password" value="ericsson"/>
+    <property name="db.user.name" value="packet"/>
+    <java classname="com.redback.db.SchemaUpdater" fork="true">
+      <arg value="${db.system.password}"/>
+      <arg value="${db.url}"/>
+      <arg value="-p"/>
+      <arg value="${db.user.password}"/>
+      <arg value="-app"/>
+      <arg value="nsm"/>
+      <arg value="-d"/>
+      <arg value="scripts/db/nsm"/>
+      <arg value="-i"/>
+      <arg value="-v"/>
+      <arg value="${db.user.name}"/>
+      <classpath>
+        <pathelement location="${model.jar.dir}"/>
+        <path refid="schema.updater.build.classpath"/>
+      </classpath>
+    </java>
+
+    <antcall target="gen-schema-checksum"/>
+    <java classname="com.ericsson.db.SchemaUpdater" fork="true">
+      <jvmarg value="-Dverbose=true"/>
+      <jvmarg value="-Dverify=true"/>
+      <arg value="scripts/db/packet"/>
+      <arg value="${db.url}"/>
+      <arg value="${db.user.name}"/>
+      <arg value="${db.user.password}"/>
+      <classpath>
+        <pathelement location="${model.jar.dir}"/>
+        <path refid="schema.updater.build.classpath"/>
+      </classpath>
+    </java>
+  </target>
+
+  <target name="detonate" depends="jar, war, ear"
+          description="An initialization target - required before one can consider 'explode-ear'">
+  </target>
+
+  <target name="explode-ear"
+          depends="build_reports, explode-model, explode-action, explode-nbi, explode-war"
+          description="Explode the NSM archive on the configured JBoss instance.">
+    <fail unless="jboss.home">jboss.home not set</fail>
+
+    <copy todir="${ear.deploy.dir}">
+      <fileset dir="${ear.dir}"/>
+    </copy>
+    <antcall target="explode-reports">
+      <param name="which.reports.dir" value="${reports.war.deploy.dir}"/>
+    </antcall>
+  </target>
+
+  <target name="explode" depends="detonate, setup-jboss, explode-ear"
+          description="Deploy the exploded archive">
+    <delete dir="${deploy.dir}" includes="*.failed"/>
+    <touch file="${deploy.dir}/${project.name}.ear.dodeploy"/>
+    <touch file="${deploy.dir}/${reports.war.dir.name}.dodeploy"/>
+  </target>
+
+  <target name="explode-model"
+          description="Used to explode the nsm model ejb-jar">
+    <mkdir dir="${jar.deploy.dir}"/>
+     <copy todir="${jar.deploy.dir}">
+      <fileset dir="${model.jar.dir}"/>
+    </copy>
+  	<copy todir="${model.jar.dir}/com/ericsson/nsm/service/discovery/l3vpn/xmlmodel">
+  	  <fileset dir="${src.model.dir}/com/ericsson/nsm/service/discovery/l3vpn/xmlmodel" includes="**/*.xsd"/>
+  	</copy>
+  </target>
+
+  <target name="explode-action"
+          description="Used to explode the nsm action ejb-jar.">
+    <mkdir dir="${client.jar.deploy.dir}"/>
+     <copy todir="${client.jar.deploy.dir}">
+      <fileset dir="${action.jar.dir}"/>
+    </copy>
+  </target>
+
+  <target name="explode-nbi" if="EV164776-is-fixed"
+          description="Used to explode the nsm nbi ejb-jars">
+    <mkdir dir="${nbi.jar.deploy.dir}"/>
+     <copy todir="${nbi.jar.deploy.dir}">
+      <fileset dir="${nbi.jar.dir}"/>
+    </copy>
+  </target>
+
+  <target name="explode-reports" depends="compile-model">
+    <fail unless="which.reports.dir"
+          message="Work property is not set: which.reports.dir"/>
+    <mkdir dir="${which.reports.dir}/img"/>
+    <mkdir dir="${which.reports.dir}/WEB-INF/classes"/>
+    <copy todir="${which.reports.dir}">
+      <fileset dir="${basedir}/reports">
+        <include name="*.jasper"/>
+      	<include name="**/*.xml"/>
+      </fileset>
+    </copy>
+    <copy todir="${which.reports.dir}/WEB-INF/classes">
+      <fileset dir="${model.jar.dir}">
+        <include name="com/redback/nsm/security/manager/NsmReportsAuthenticationModule.class"/>
+        <include name="com/redback/nsm/security/manager/NsmReportsAuthenticationRemote.class"/>
+      </fileset>
+    </copy>
+    <copy todir="${which.reports.dir}/img">
+      <fileset dir="${basedir}/view/img/report-images">
+        <include name="**/*"/>
+      </fileset>
+    </copy>
+  </target>
+
+  <target name="unexplode-reports">
+    <delete dir="${reports.war.deploy.dir}" failonerror="no"/>
+  </target>
+
+  <target name="explode-war" depends="war"
+          description="Deploy the exploded war archive">
+    <fail unless="jboss.home">jboss.home not set</fail>
+
+    <mkdir dir="${war.deploy.dir}"/>
+    <copy todir="${war.deploy.dir}">
+      <fileset dir="${war.dir}"/>
+    </copy>
+  </target>
+
+  <target name="unexplode" description="Undeploy the exploded archive">
+    <delete dir="${ear.deploy.dir}" failonerror="no"/>
+    <antcall target="unexplode-reports"/>
+  </target>
+
+  <target name="restart" depends="explode"
+          description="Restart the exploded archive">
+    <touch file="${ear.deploy.dir}/META-INF/application.xml"/>
+  </target>
+
+  <target name="deploy" depends="build-nsm-archive, build_reports, setup-jboss"
+          description="Deploy to JBoss AS">
+    <fail unless="jboss.home">jboss.home not set</fail>
+    <copy todir="${deploy.dir}" file="${dist.dir}/${project.name}.ear"/>
+    <antcall target="explode-reports">
+      <param name="which.reports.dir" value="${reports.war.deploy.dir}"/>
+    </antcall>
+  </target>
+
+  <target name="undeploy" description="Undeploy the example from JBoss">
+    <delete file="${ear.deploy.dir}"/>
+  </target>
+
+  <target name="setup-jboss">
+    <fail unless="jboss.home">jboss.home not set</fail>
+
+    <antcall target="assemble-application-server-override-contents">
+      <param name="which.server.home.dir" value="${jboss.home}"/>
+    </antcall>
+
+    <hostinfo/>
+    <echo message="Configuring for host: ${ADDR4}"/>
+    <propertyfile file="${jboss.home}/standalone/configuration/iptnms.properties">
+      <entry key="jboss.bind.address" default="${ADDR4}"/>
+      <entry key="ORBInitRef.NameService" default="corbaloc::${ADDR4}:9000/NameService"/>
+      <entry key="jboss.datasources.nsm.host" default="localhost"/>
+      <entry key="jboss.datasources.nsm.port" default="5432"/>
+      <entry key="jboss.datasources.nsm.dbname" default="CCCdata"/>
+      <entry key="jboss.datasources.nsm.username" default="packet"/>
+      <entry key="jboss.datasources.nsm.password" default="0C945E98A82F3463E9BA2164E41C00D3"/>
+      <entry key="jboss.configuration.path" default="${jboss.home}/standalone/configuration"/>
+      <entry key="jboss.web.https.keystore.file" default="${jboss.home}/standalone/configuration/server.keystore"/>
+      <entry key="iptnms.license.disabled" default="true"/>
+    </propertyfile>
+
+    <propertyfile file="${jboss.home}/standalone/configuration/application-roles.properties">
+      <entry key="guest" value="guest"/>
+    </propertyfile>
+  </target>
+
+  <target name="update-vault-info">
+    <echo message="Updating the Jboss vault info in ${overrides.install.script.dir}/standalone-${profile}.xml..."/>
+  	<echo message="This task is used to update the vault information in the jboss configuration files. Please override the required parameters if needed."/>
+    <property name="https.keystore.vault.block" value="https.keystore"/>
+  	<property name="https.keystore.password.vault.attribute" value="password"/>
+  	<property name="https.keystore.password.shared.key" value="ODNmMjE4ODAtMGY3OS00ZmFiLThhM2YtZjNhZjIyMzc4NjhkTElORV9CUkVBS3ZhdWx0"/>
+ 	<property name="vault.keystore.url" value="${jboss.configuration.path}/vault.keystore"/>
+ 	<property name="vault.keystore.password.mask" value="MASK-2Tql88YQk08P8YxRRVFpwv"/>
+ 	<property name="vault.keystore.salt" value="Security"/>
+ 	<property name="vault.keystore.alias" value="vault"/>
+ 	<property name="vault.keystore.iteration_count" value="50"/>
+ 	<property name="vault.keystore.enc.dir" value="${jboss.configuration.path}/"/>
+    <chmod file="${overrides.install.script.dir}/standalone-${profile}.xml" perm="u+w"/>
+    <replaceregexp file="${overrides.install.script.dir}/standalone-${profile}.xml"
+                   match="&lt;(.*)vault-option(.*)KEYSTORE_URL(.*)/&gt;$" replace="&lt;vault-option name=&quot;KEYSTORE_URL&quot; value=&quot;${vault.keystore.url}&quot; /&gt;" byline="true"/>
+  	<replaceregexp file="${overrides.install.script.dir}/standalone-${profile}.xml"
+  	               match="&lt;(.*)vault-option(.*)KEYSTORE_PASSWORD(.*)/&gt;$" replace="&lt;vault-option name=&quot;KEYSTORE_PASSWORD&quot; value=&quot;${vault.keystore.password.mask}&quot; /&gt;" byline="true"/>
+  	<replaceregexp file="${overrides.install.script.dir}/standalone-${profile}.xml"
+  	  	               match="&lt;(.*)vault-option(.*)KEYSTORE_ALIAS(.*)/&gt;$" replace="&lt;vault-option name=&quot;KEYSTORE_ALIAS&quot; value=&quot;${vault.keystore.alias}&quot; /&gt;" byline="true"/>
+  	<replaceregexp file="${overrides.install.script.dir}/standalone-${profile}.xml"
+  	               match="&lt;(.*)vault-option(.*)SALT(.*)/&gt;$" replace="&lt;vault-option name=&quot;SALT&quot; value=&quot;${vault.keystore.salt}&quot; /&gt;" byline="true"/>
+  	<replaceregexp file="${overrides.install.script.dir}/standalone-${profile}.xml"
+  	               match="&lt;(.*)vault-option(.*)ITERATION_COUNT(.*)/&gt;$" replace="&lt;vault-option name=&quot;ITERATION_COUNT&quot; value=&quot;${vault.keystore.iteration_count}&quot; /&gt;" byline="true"/>
+  	<replaceregexp file="${overrides.install.script.dir}/standalone-${profile}.xml"
+  	  	           match="&lt;(.*)vault-option(.*)ENC_FILE_DIR(.*)/&gt;$" replace="&lt;vault-option name=&quot;ENC_FILE_DIR&quot; value=&quot;${vault.keystore.enc.dir}&quot; /&gt;" byline="true"/>
+  	<replaceregexp file="${overrides.install.script.dir}/standalone-${profile}.xml"
+  	  	  	       match="&lt;(.*)ssl name(.*)password(.*)certificate-key-file" replace="&lt;ssl name=&quot;https&quot; password=&quot;$\{VAULT::${https.keystore.vault.block}::${https.keystore.password.vault.attribute}::${https.keystore.password.shared.key}\}&quot; certificate-key-file" byline="true"/>
+  </target>
+
+  <target name="deploy-vault-info">
+    <fail unless="jboss.home">jboss.home not set</fail>
+    <echo message="Deploying vault info and ssl keystore to ${jboss.home}/standalone/configuration..."/>
+    <copy todir="${jboss.home}/standalone/configuration">
+      <fileset dir="${overrides.install.script.dir}">
+          <include name="ENC.dat"/>
+          <include name="Shared.dat"/>
+      	  <include name="server.keystore"/>
+      	  <include name="vault.keystore"/>
+      </fileset>
+    </copy>
+    <copy file="${overrides.install.script.dir}/standalone-${profile}.xml"
+          tofile="${jboss.home}/standalone/configuration/standalone-iptnms.xml"/>
+  </target>
+
+  <target name="clean-bind-dir">
+    <delete failonerror="no">
+      <fileset dir="${model.jar.dir}">
+        <include name="**"/>
+      </fileset>
+    </delete>
+    <delete failonerror="no">
+      <fileset dir="${test.dir}">
+        <exclude name="**/*.class" if="eclipse.running"/>
+      </fileset>
+    </delete>
+  </target>
+
+  <target name="clean" description="Cleans up the build directory">
+    <antcall target="clean-bind-dir"/>
+    <delete dir="${dist.dir}"/>
+    <delete dir="${ear.dir}"/>
+    <delete dir="${war.dir}"/>
+    <delete dir="${model.jar.dir}"/>
+    <delete dir="${nbi.dir}"/>
+    <delete dir="${explodedarchives.dir}"/>
+    <delete dir="${src.schema.dir}" failonerror="no"/>
+    <delete dir="${test.dir}"/>
+    <delete dir="${rpmpackage.dir}" failonerror="no"/>
+    <delete dir="${dist.package.dir}" failonerror="no"/>
+    <delete dir="${raw.package.dir}" failonerror="no"/>
+    <delete dir="${package.dir}" failonerror="no"/>
+    <delete dir="${work.dir}"/>
+    <delete dir="${target.dir}"/>
+    <antcall target="clean-correlation"/>
+    <antcall target="clean-reports"/>
+    <delete dir="${javascript.test.report.dir}"/>
+  </target>
+
+  <target name="clean-jboss"
+          description="Cleans up JBoss deploy and temp files">
+    <delete dir="${jboss.home}/standalone/tmp" quiet="true" failonerror="no"/>
+    <delete dir="${ear.deploy.dir}" failonerror="no"/>
+  </target>
+
+  <target name="compile-test" description="Compile JUnit Tests">
+    <mkdir dir="${test.class.dir}"/>
+    <javac srcdir="${src.test.dir}" destdir="${test.class.dir}"
+           debug="${javac.debug}" deprecation="${javac.deprecation}" nowarn="on">
+      <classpath>
+        <pathelement location="${model.jar.dir}"/>
+        <pathelement location="${action.jar.dir}"/>
+        <!-- TODO: correlation test classes should be moved to correlation dir -->
+        <pathelement location="${src.correlation.dir}/build/classes"/>
+        <path refid="build.classpath"/>
+        <path refid="esa.dependencies.classpath"/>
+      </classpath>
+      <patternset>
+        <invert>
+          <patternset refid="legacy.test.files"/>
+        </invert>
+      </patternset>
+    </javac>
+  	
+  	<mkdir dir="${test.class.dir}/META-INF"/>
+  	<copy file="${src.test.dir}/persistence.xml" todir="${test.class.dir}/META-INF"/>
+  </target>
+
+  <target name="junit-test" depends="jar-log4j-config, compile-schema-updater, compile-test"
+          description="Run JUnit tests">
+    <property name="test.filter" value="**/*Test.class"/>
+    <taskdef resource="org/jacoco/ant/antlib.xml">
+      <classpath>
+        <fileset dir="${lib.dir}" includes="org/jacoco/org.jacoco.ant/0.5.8.201207111220/*.jar"/>
+      </classpath>
+    </taskdef>
+
+    <!-- clean out old results first -->
+    <delete file="${test.coverage.datafile}"/>
+    <delete dir="${test.report.dir}"/>
+    <mkdir dir="${test.report.dir}"/>
+
+    <!-- Run tests -->
+    <echo message="Running JUnit tests"/>
+    <coverage destfile="${test.coverage.datafile}" enabled="${test.coverage.enabled}">
+      <junit dir="${basedir}" fork="true" forkmode="once" 
+          failureproperty="test.failed" printsummary="${test.summary.print}">
+      	<jvmarg value="-XX:MaxPermSize=256m"/>
+        <classpath>
+          <pathelement location="${model.jar.dir}"/>
+        	<pathelement location="${action.jar.dir}"/>
+          <pathelement location="${test.class.dir}"/>
+          <!-- TODO: correlation tests should be under the correlation dir -->
+          <pathelement location="${src.correlation.dir}/build/classes"/>
+          <path refid="build.classpath"/>
+          <path refid="esa.dependencies.classpath"/>
+        </classpath>
+        <formatter type="plain"/>
+        <formatter type="xml"/>
+        <batchtest todir="${test.report.dir}">
+          <fileset dir="${test.class.dir}">
+            <include name="${test.filter}"/>
+            <patternset>
+              <invert>
+                <patternset refid="legacy.test.files"/>
+              </invert>
+            </patternset>
+          </fileset>
+        </batchtest>
+      	<jvmarg value="-XX:-UseSplitVerifier"/>
+      </junit>
+    </coverage>
+
+    <!-- merge test results and print summary -->
+    <property name="test.report.summary" 
+        location="${test.report.dir}/junit-summary.properties"/>
+    <junitreport todir="${test.report.dir}">
+      <fileset dir="${test.report.dir}">
+        <include name="TEST-*.xml"/>
+      </fileset>
+    </junitreport>
+    <xslt style="${basedir}/junit-summary.xsl"
+        in="${test.report.dir}/TESTS-TestSuites.xml" out="${test.report.summary}"/>
+    <property file="${test.report.summary}"/>
+    <echo message="Tests run: ${junit.tests}, Failures: ${junit.failures}, Errors: ${junit.errors}, Time elapsed: ${junit.time} sec"/>
+    <delete dir="${test.report.dir}">
+      <include name="*.xml"/>
+    </delete>
+    <!-- generate coverage report -->
+    <fail message="JUnit test(s) failed">
+      <condition>
+        <and>
+          <istrue value="${test.failonerror}"/>
+          <isset property="test.failed"/>
+        </and>
+      </condition>
+    </fail>
+    <antcall target="generate-coverage-report"/>
+  </target>
+
+  <target name="generate-coverage-report" description="Generate unit test coverage report">
+    <available property="test.coverage.datafile.exists" 
+        file="${test.coverage.datafile}"/>
+    <fail unless="test.coverage.datafile.exists"
+        message="${test.coverage.datafile} does not exist"/>
+
+    <mkdir dir="${test.report.coverage.dir}"/>
+    <report>
+      <executiondata>
+        <file file="${test.coverage.datafile}"/>
+      </executiondata>
+      <structure name="${project.name}">
+        <classfiles>
+          <fileset dir="${model.jar.dir}">
+            <!-- TODO: test classes should be moved to test dir -->
+            <exclude name="**/test/**"/>
+          </fileset>
+          <fileset dir="${src.correlation.dir}/build/classes">
+        	<!-- alarm correlation test -->
+        	<exclude name="**/test/**"/>
+          </fileset>	
+        </classfiles>
+        <sourcefiles>
+          <fileset dir="${src.model.dir}" includes="**/*.java"/>
+          <fileset dir="${src.correlation.dir}/src"/>
+        </sourcefiles>
+      </structure>
+      <html destdir="${test.report.coverage.dir}"/>
+    </report>
+  </target>
+  
+  <target name="pmd" description="Run PMD static analysis on Java source files">
+    <taskdef name="pmd" classname="net.sourceforge.pmd.ant.PMDTask">
+      <classpath id="pmd.classpath">
+        <fileset dir="${lib.dir}">
+          <include name="pmd/pmd/4.3/*.jar"/>
+          <include name="asm/asm/3.2/*.jar"/>
+          <include name="jaxen/jaxen/1.1.1/*.jar"/>
+        </fileset>
+      </classpath>
+    </taskdef>
+    
+    <mkdir dir="${target.dir}"/>
+    <delete file="${pmd.report.txt.file}"/>
+    
+    <pmd shortfilenames="true" targetjdk="1.6">
+      <ruleset>${modules.dir}/pmd-config.xml</ruleset>
+      <formatter type="text" tofile="${pmd.report.txt.file}"/>
+      <fileset dir="${src.common.dir}" includes="**/*.java"/>
+      <fileset dir="${src.model.dir}" includes="**/*.java"/>
+      <fileset dir="${src.action.dir}" includes="**/*.java"/>
+      <fileset dir="${src.nbi.dir}" includes="**/*.java"/>
+      <fileset dir="${src.cable.nbi.dir}" includes="**/*.java"/>
+    </pmd>
+    <echo message="Analysis report: ${pmd.report.txt.file}"/>
+  </target>
+
+  <target name="compile-legacy-tests" depends="init-wsprovide, compile-model"
+          description="Compile the Java source code" if="build.tests" unless="eclipse.running">
+    <javac bootclasspathref="jre.libs" includeJavaRuntime="yes"
+           destdir="${model.jar.dir}"
+           debug="${javac.debug}" deprecation="${javac.deprecation}"
+           nowarn="on">
+      <classpath>
+        <path refid="build.classpath"/>
+        <path refid="esa.dependencies.classpath"/>
+      </classpath>
+      <src path="${src.test.dir}"/>
+      <patternset refid="legacy.test.files"/>
+    	<patternset>
+        <invert>
+          <patternset refid="schema.updater.package.path"/>
+        </invert>
+      </patternset>
+    </javac>
+
+    <!-- Build the Test TED WSDL -->
+    <echo>Building TED Test WS</echo>
+    <wsprovide fork="false"
+             destdir="${nbi.dir}/java/bin"
+             genwsdl="true"
+             keep="true"
+             resourcedestdir="${nbi.dir}/wsdl"
+             sourcedestdir="${nbi.dir}/java/src"
+             sei="com.redback.nsm.network.ted.TestTED">
+      <classpath>
+    	<!--  <path refid="build.classpath"/> -->
+          <pathelement path="${model.jar.dir}"/>
+      </classpath>
+    </wsprovide>
+
+    <!-- Build the Test MPLS-TP WSDL -->
+    <echo>Building MPLS-TP Test WS</echo>
+    <wsprovide fork="false"
+             destdir="${nbi.dir}/java/bin"
+             genwsdl="true"
+             keep="true"
+             resourcedestdir="${nbi.dir}/wsdl"
+             sourcedestdir="${nbi.dir}/java/src"
+             sei="com.redback.nsm.service.mplstp.entities.TestMplsTp">
+      <classpath>
+    	<!--  <path refid="build.classpath"/> -->
+          <pathelement path="${model.jar.dir}"/>
+      </classpath>
+    </wsprovide>
+
+    <!-- Build the TestCesServiceBuilder WSDL -->
+    <echo>Building CesServiceBuilder Test WS</echo>
+    <wsprovide fork="false"
+             destdir="${nbi.dir}/java/bin"
+             genwsdl="true"
+             keep="true"
+             resourcedestdir="${nbi.dir}/wsdl"
+             sourcedestdir="${nbi.dir}/java/src"
+             sei="com.redback.nsm.service.ces.TestCesServiceBuilder">
+      <classpath>
+    	<!--  <path refid="build.classpath"/> -->
+          <pathelement path="${model.jar.dir}"/>
+      </classpath>
+    </wsprovide>
+
+    <!-- Build the TestServiceDiscovery WSDL -->
+    <echo>Building the TestServiceDiscovery WSDL</echo>
+    <wsprovide fork="false"
+               destdir="${nbi.dir}/java/bin"
+               genwsdl="true"
+               keep="true"
+               resourcedestdir="${nbi.dir}/wsdl"
+               sourcedestdir="${nbi.dir}/java/src"
+               sei="com.redback.nsm.service.discovery.eth.TestServiceDiscovery">
+      <classpath>
+    	<!--  <path refid="build.classpath"/> -->
+          <pathelement path="${model.jar.dir}"/>
+      </classpath>
+    </wsprovide>
+  </target>
+
+  <target name="copytestclasses" if="eclipse.running"
+          description="Copy classes compiled by eclipse to the test dir">
+    <mkdir dir="${test.class.dir}"/>
+    <copy todir="${test.class.dir}">
+      <fileset dir="classes/common" includes="**/*.class"/>
+      <fileset dir="classes/model" includes="**/*.class"/>
+      <fileset dir="classes/action" includes="**/*.class"/>
+      <fileset dir="classes/test" includes="**/*.class"/>
+    </copy>
+  </target>
+
+  <target name="buildtest" depends="bindtest, copytestclasses"
+          description="Build the tests">
+    <copy todir="${test.class.dir}">
+      <fileset dir="${resources.dir}">
+        <exclude name="META-INF/persistence*.xml"/>
+        <exclude name="import*.sql"/>
+      </fileset>
+    </copy>
+    <copy tofile="${test.class.dir}/META-INF/persistence.xml"
+          file="${resources.dir}/META-INF/persistence-test.xml"
+          overwrite="true"/>
+    <copy tofile="${test.class.dir}/import.sql"
+          file="${resources.dir}/import-test.sql" overwrite="true"/>
+    <copy todir="${test.class.dir}" flatten="true">
+      <fileset dir="${src.test.dir}">
+        <include name="**/*Test.xml"/>
+      </fileset>
+    </copy>
+  </target>
+
+  <target name="test-testng" depends="buildtest" description="Run TestNG tests">
+    <taskdef resource="testngtasks" classpath="${lib.dir}/org/testng/testng/5.14.10/*.jar"/>
+    <path id="test.path">
+      <path path="${test.class.dir}"/>
+      <path path="${bootstrap.dir}"/>
+      <path refid="build.classpath"/>
+    </path>
+    <testng outputdir="${test.report.dir}">
+      <jvmarg line="-Djava.endorsed.dirs=${basedir}/endorsed"/>
+      <jvmarg line="-Dsun.lang.ClassLoader.allowArraySyntax=true"/>
+      <classpath refid="test.path"/>
+      <xmlfileset dir="${test.class.dir}" includes="*Test.xml"/>
+    </testng>
+  </target>
+
+  <target name="validateConfiguration" depends="war, ear, jar"
+          description="Validate the xml configuration files">
+    <mkdir dir="${schema.dir}"/>
+    <unjar src="${lib.dir}/org/jboss/seam/jboss-seam/2.3.1.CR1/jboss-seam-2.3.1.CR1.jar" dest="${schema.dir}">
+      <patternset>
+        <include name="org/jboss/seam/*.xsd"/>
+        <include name="org/jboss/seam/*.dtd"/>
+      </patternset>
+    </unjar>
+    <ant antfile="validate.xml" target="validateConfiguration"/>
+  </target>
+
+  <!--
+    If there are changes to the xsd, execute this target to re-create the JAXB classes.
+    -->
+  <target name="generate-java-from-xsd" description="Generate JAXB bindings">
+    <taskdef name="xjc" classname="com.sun.tools.xjc.XJCTask">
+      <classpath refid="build.classpath" />
+    </taskdef>
+
+    <xjc destdir="src/model" package="com.ericsson.nsm.service.discovery.l3vpn.xmlmodel"
+      schema="${src.model.dir}/com/ericsson/nsm/service/discovery/l3vpn/xmlmodel/l3vpn-discovery.xsd"
+      binding="${src.model.dir}/com/ericsson/nsm/service/discovery/l3vpn/xmlmodel/l3vpn-discovery-bindings.xjb">
+      <arg value="-no-header"/>
+    </xjc>
+  </target>
+
+  <target name="bind" depends="clean-bind-dir, init, compile"
+          description="performs the jibx bind compiling">
+    <taskdef name="bind" classname="org.jibx.binding.ant.CompileTask">
+      <classpath refid="jibx.build.classpath"/>
+    </taskdef>
+    <bind load="true">
+      <bindingfileset refid="jibx.binding.files"/>
+      <classpathset dir="${model.jar.dir}"/>
+    </bind>
+  </target>
+
+  <target name="bindtest" depends="clean-bind-dir, compile"
+          description="performs the jibx bind compiling">
+    <taskdef name="bind" classname="org.jibx.binding.ant.CompileTask">
+      <classpath refid="jibx.build.classpath"/>
+    </taskdef>
+    <bind verbose="true" load="true">
+      <bindingfileset refid="jibx.binding.files"/>
+      <classpathset dir="${test.class.dir}"/>
+    </bind>
+  </target>
+
+  <target name="assemble-dmi-content">
+    <!-- ${which.package.content.root.dir} represents
+         /opt/ericsson/iptnms/packet-<version> -->
+    <fail unless="which.package.content.root.dir"
+          message="Work property is not set: which.package.content.root.dir"/>
+    <fail unless="dmi.content.root"
+          message="Work property is not set: dmi.content.root"/>
+    <available property="dmi.content.root.available" file="${dmi.content.root}"/>
+    <fail unless="dmi.content.root.available"
+          message="${dmi.content.root} not found"/>
+    <property name="dmi.dir.name" value="dmi"/>
+    <!-- Directory where the legacy SOESA jar files are located -->
+    <mkdir dir="${which.package.content.root.dir}/${dmi.dir.name}/ext"/>
+    <mkdir dir="${which.package.content.root.dir}/${dmi.dir.name}/lib"/>
+    <mkdir dir="${which.package.content.root.dir}/${dmi.dir.name}/data"/>
+    <mkdir dir="${which.package.content.root.dir}/scripts/db/schema/${dmi.dir.name}"/>
+    <!-- Add the legacy SOESA files to this package -->
+    <copy todir="${which.package.content.root.dir}/${dmi.dir.name}/ext">
+      <fileset dir="${dmi.content.root}/ext" includes="**/*.jar"/>
+    </copy>
+    <copy todir="${which.package.content.root.dir}/${dmi.dir.name}/lib">
+      <fileset dir="${dmi.content.root}/lib" includes="**/*.jar"/>
+    </copy>
+    <copy todir="${which.package.content.root.dir}/${dmi.dir.name}/data">
+      <fileset dir="${dmi.content.root}/data"/>
+    </copy>
+    <copy todir="${which.package.content.root.dir}/scripts/db/schema/${dmi.dir.name}">
+      <fileset dir="${dmi.content.root}/dbase"/>
+    </copy>
+    <delete dir="${dmi.content.root}" failonerror="no"/>
+  </target>
+
+  <target name="assemble-binaries-package-contents"
+          description="Create the production directory structure for the NSM binaries package">
+    <!-- ${which.package.content.root.dir} represents
+         /opt/ericsson/iptnms/packet-<version> -->
+    <fail unless="which.package.content.root.dir"
+          message="Work property is not set: which.package.content.root.dir"/>
+    <mkdir dir="${which.package.content.root.dir}/topology/default"/>
+    <!-- Directory where customers can store their own topology images -->
+    <mkdir dir="${which.package.content.root.dir}/topology/override"/>
+    <!-- Add default topology tile archives to this package -->
+    <copy todir="${which.package.content.root.dir}/topology/default">
+      <mapper type="flatten"/>
+      <fileset dir="${lib.dir}" includes="org/openlayers/tiles/SNAPSHOT/*.zip"/>
+    </copy>
+
+    <!-- Use a temporary directory to serve as the root directory for creating
+         archive files that will be included in the NSM binaries package -->
+    <tempfile property="nsm.binaries.temp.archive.root" suffix="-root"
+              destdir="${java.io.tmpdir}" prefix="${project.name}-bin-"/>
+    <!-- Add the NSM deployment tar archive to this package -->
+    <antcall target="assemble-deployment-archive-contents">
+      <param name="which.archive.root.dir"
+             value="${nsm.binaries.temp.archive.root}"/>
+    </antcall>
+    <tar basedir="${nsm.binaries.temp.archive.root}"
+         destfile="${which.package.content.root.dir}/${project.name}-deploy.tar"/>
+    <delete dir="${nsm.binaries.temp.archive.root}"/>
+    <!-- Add the cable WiFi client to this package -->
+    <antcall target="assemble-cable-wifi-client">
+      <param name="which.archive.root.dir"
+             value="${nsm.binaries.temp.archive.root}"/>
+    </antcall>
+    <zip basedir="${nsm.binaries.temp.archive.root}"
+         destfile="${which.package.content.root.dir}/${cable.client.archive.name}.zip"/>
+    <delete dir="${nsm.binaries.temp.archive.root}"/>
+    <!-- Add the application server overrides archive to this package -->
+    <antcall target="assemble-application-server-override-contents">
+      <param name="which.server.home.dir"
+             value="${nsm.binaries.temp.archive.root}"/>
+    </antcall>
+    <tar basedir="${nsm.binaries.temp.archive.root}"
+         destfile="${which.package.content.root.dir}/${default.app.server.overrides.archive.name}.tar"/>
+    <delete dir="${nsm.binaries.temp.archive.root}"/>
+  </target>
+
+  <target name="init-rpm-packaging"
+          description="Initialize the RPM packaging directories">
+    <antcall target="link-to-scratch" inheritall="false">
+      <param name="rbak.tools.link.work" value="${rpmpackage.dir}"/>
+    </antcall>
+    <mkdir dir="${rpmpackage.dir}/BUILD"/>
+    <mkdir dir="${rpmpackage.dir}/RPMS"/>
+    <mkdir dir="${rpmpackage.dir}/SOURCES"/>
+    <mkdir dir="${rpmpackage.dir}/SPECS"/>
+    <mkdir dir="${rpmpackage.dir}/SRPMS"/>
+  </target>
+
+  <target name="assemble-packet-scripts" depends="gen-schema-checksum">
+    <fail unless="which.package.content.root.dir"
+          message="Work property is not set: which.package.content.root.dir"/>
+    <mkdir dir="${which.package.content.root.dir}/lib"/>
+    <mkdir dir="${which.package.content.root.dir}/tools"/>
+    <mkdir dir="${which.package.content.root.dir}/scripts/control"/>
+    <mkdir dir="${which.package.content.root.dir}/scripts/appserver"/>
+    <mkdir dir="${which.package.content.root.dir}/scripts/db/schema"/>
+    <property name="networkConfiguration.dir.name" value="data/network_configuration/xsl"/>
+    <mkdir dir="${which.package.content.root.dir}/${networkConfiguration.dir.name}"/>
+    <!-- app-admin.ksh should be the only one script at the root directory -->
+    <copy todir="${which.package.content.root.dir}"
+          file="${packet.scripts.dir}/admin/app-admin.ksh">
+      <filterset>
+        <filter token="${application.name.token}" value="${application.name}"/>
+      </filterset>
+    </copy>
+    <!-- Copy all the application run scripts except for app-admin.ksh -->
+    <copy todir="${which.package.content.root.dir}/scripts">
+      <fileset dir="${packet.scripts.dir}/admin">
+        <include name="*.ksh"/>
+        <exclude name="app-admin.ksh"/>
+      </fileset>
+      <!-- TODO: When we no longer use Solaris as a build
+           TODO: platform, add replacement tokens to the Packet
+           TODO: script files so that we can properly assert
+           TODO: Java and JBoss environment constraints -->
+    </copy>
+    <!-- Copy the library scripts -->
+    <copy todir="${which.package.content.root.dir}/lib">
+      <fileset dir="${packet.scripts.dir}/common" includes="*.ksh"/>
+      <filterset>
+        <filter token="${release.version.token}" value="${release.version}"/>
+        <filter token="${application.name.token}" value="${application.name}"/>
+      </filterset>
+    </copy>
+    <!-- Copy the tool files -->
+    <copy todir="${which.package.content.root.dir}/tools">
+      <fileset dir="${packet.scripts.dir}/tools"  excludes="install-license.ksh"/>
+      <filterset>
+        <filter token="${application.name.token}" value="${application.name}"/>
+      </filterset>
+    </copy>
+    <!-- Copy the control scripts -->
+    <copy todir="${which.package.content.root.dir}/scripts/control">
+      <fileset dir="${packet.scripts.dir}/control" includes="*.ksh"/>
+    </copy>
+    <!-- Copy the application server scripts -->
+    <copy todir="${which.package.content.root.dir}/scripts/appserver">
+      <fileset dir="${packet.scripts.dir}/appserver"/>
+      <filterset>
+        <filter token="${build.java.version.token}" value="${java.version}"/>
+      </filterset>
+    </copy>
+    <copy tofile="${which.package.content.root.dir}/scripts/appserver/.loglevels.properties"
+          file="${packet.scripts.dir}/admin/loglevels.properties"/>
+    <!-- Copy the SQL patch files -->
+    <copy todir="${which.package.content.root.dir}/scripts/db/schema">
+      <fileset dir="${db.scripts.dir}/nsm" includes="*.sql"/>
+      <fileset dir="${db.scripts.dir}/packet">
+        <include name="updates.list"/>
+        <include name="post-updates.sql"/>
+        <include name="schema.md5"/>
+        <include name="**/*.sql"/>
+      </fileset>
+    </copy>
+    <!-- Copy the database scripts -->
+    <copy todir="${which.package.content.root.dir}/scripts/db">
+      <fileset dir="${packet.scripts.dir}/db"/>
+    </copy>
+    <!-- service discovery -->
+    <copy todir="${which.package.content.root.dir}/${networkConfiguration.dir.name}">
+      <fileset dir="${src.model.dir}/com/ericsson/nsm/service/discovery/l3vpn/xsl" includes="*" />
+    </copy>
+    <!-- end service discovery -->  	
+  </target>
+
+ 
+
+  <target name="prepare-rpm-spec">
+    <available file="${packet.spec.file}"
+               property="rpm.spec.file.available"/>
+    <fail unless="rpm.spec.file.available" message="RPM spec file not found"/>
+    <fail unless="which.target.spec"
+          message="Work property not set: which.target.spec"/>
+    <chmod file="${scripts.dir}/install/rpm/prepareRpmSpec.ksh" perm="u+x"/>
+    <exec executable="${scripts.dir}/install/rpm/prepareRpmSpec.ksh"
+          failonerror="true">
+      <arg value="${release.version}"/>
+      <arg value="${packet.spec.file}"/>
+      <arg value="${which.target.spec}"/>
+    </exec>
+  </target>
+
+  <target name="assemble-packet-rpm-contents"
+          depends="bind, build-nsm-archive, build-correlation-archive, jar-schema-updater, init-rpm-packaging">
+    <fail unless="which.package.content.root.dir"
+          message="Work property is not set: which.package.content.root.dir"/>
+    <antcall target="assemble-packet-scripts"/>
+    <antcall target="assemble-binaries-package-contents">
+      <param name="which.package.content.root.dir"
+             value="${which.package.content.root.dir}/bin"/>
+    </antcall>
+    <!-- Add the DMI server content to this package -->
+    <antcall target="assemble-dmi-content"/>
+
+    <copy todir="${which.package.content.root.dir}/bin">
+      <fileset dir="${dist.dir}" includes="*${schema.updater.jar.name}*.jar"/>
+      <fileset dir="${dist.dir}" includes="${security.engine.jar.name}"/>
+    </copy>
+    <copy todir="${which.package.content.root.dir}/documents">
+      <fileset dir="${dist.dir}" includes="${nbi.client.name}"/>
+    </copy>
+  </target>
+
+  <target name="rpm-packet">
+    <antcall target="assemble-packet-rpm-contents">
+      <param name="which.package.content.root.dir"
+             value="${rpmpackage.dir}/pkgroot"/>
+    </antcall>
+    <antcall target="prepare-rpm-spec">
+      <param name="which.target.spec" value="${final.rpm.spec.path}"/>
+    </antcall>
+    <!-- Explicitly set the rpmbuildcommand attribute for
+         physical SLES boxes -->
+    <rpm specfile="${final.rpm.spec.filename}" topdir="${rpmpackage.dir}"
+         rpmbuildcommand="rpmbuild" command="-vv -bb" failonerror="true"/>
+  </target>
+
+  <target name="rpm-jboss" depends="init-rpm-packaging">
+    <!-- Change to "jboss-dev.spec" for package development version -->
+    <property name="jboss.rpm.spec.name" value="jboss.spec"/>
+    <copy todir="${rpmpackage.dir}/SPECS"
+          file="${scripts.dir}/install/rpm/${jboss.rpm.spec.name}">
+      <filterset>
+        <filter token="${jboss.archive.path.token}"
+                value="${nsm.jboss.archive.path}"/>
+        <filter token="${jboss.current.version.token}"
+                value="${jboss.current.version}"/>
+      </filterset>
+    </copy>
+    <rpm specfile="${jboss.rpm.spec.name}" topdir="${rpmpackage.dir}"
+         rpmbuildcommand="rpmbuild" command="-vv -bb" failonerror="true"/>
+  </target>
+
+  <target name="assemble-installer-rpm-contents">
+    <fail unless="which.package.content.root.dir"
+          message="Work property is not set: which.package.content.root.dir"/>
+    <mkdir dir="${which.package.content.root.dir}/data"/>
+    <mkdir dir="${which.package.content.root.dir}/log"/>
+    <copy todir="${which.package.content.root.dir}">
+      <fileset dir="${scripts.dir}/packet/install" includes="*.ksh"/>
+      <fileset dir="${scripts.dir}/packet/common" includes="common_utils.ksh"/>
+    </copy>
+  </target>
+
+  <target name="rpm-installer" depends="init-rpm-packaging">
+    <property name="installer.rpm.spec.name" value="iptnms-installer.spec"/>
+    <antcall target="assemble-installer-rpm-contents">
+      <param name="which.package.content.root.dir"
+             value="${rpmpackage.dir}/installerPkgRoot"/>
+    </antcall>
+    <copy todir="${rpmpackage.dir}/SPECS"
+          file="${scripts.dir}/install/rpm/${installer.rpm.spec.name}"/>
+    <!-- Explicitly set the rpmbuildcommand attribute for
+         physical SLES boxes -->
+    <rpm specfile="${installer.rpm.spec.name}" topdir="${rpmpackage.dir}"
+         rpmbuildcommand="rpmbuild" command="-vv -bb" failonerror="true"/>
+  </target>
+	
+  <target name="assemble-hardening-rpm-contents">
+    <fail unless="which.package.content.root.dir"
+          message="Work property is not set: which.package.content.root.dir"/>
+    <mkdir dir="${which.package.content.root.dir}/log"/>
+    <copy todir="${which.package.content.root.dir}">
+      <fileset dir="${packet.scripts.dir}/hardening" includes="**/*.ksh,**/configure_port"/>
+    </copy>
+  </target>
+	
+  <target name="rpm-hardening-tools" depends="init-rpm-packaging">
+    <property name="hardening.rpm.spec.name" value="hardening.spec"/>
+    <antcall target="assemble-hardening-rpm-contents">
+      <param name="which.package.content.root.dir"
+             value="${rpmpackage.dir}/installerPkgRoot/hardening"/>
+    </antcall>
+    <copy todir="${rpmpackage.dir}/SPECS"
+          file="${scripts.dir}/install/rpm/${hardening.rpm.spec.name}"/>
+    <!-- Explicitly set the rpmbuildcommand attribute for
+         physical SLES boxes -->
+    <rpm specfile="${hardening.rpm.spec.name}" topdir="${rpmpackage.dir}"
+         rpmbuildcommand="rpmbuild" command="-vv -bb" failonerror="true"/>
+  </target>
+	
+  <target name="assemble-pg-migrator-rpm-contents">
+    <fail unless="which.package.content.root.dir"
+          message="Work property is not set: which.package.content.root.dir"/>
+    <mkdir dir="${which.package.content.root.dir}"/>
+    <copy todir="${which.package.content.root.dir}">
+      <fileset dir="${scripts.dir}/tools/pg_82_migrator" includes="*.ksh"/>
+    </copy>
+  </target>
+
+  <target name="rpm-pg-migrator" depends="init-rpm-packaging">
+    <property name="installer.rpm.spec.name" value="pg82migrator.spec"/>
+    <antcall target="assemble-pg-migrator-rpm-contents">
+      <param name="which.package.content.root.dir"
+             value="${rpmpackage.dir}/installerPkgRoot"/>
+    </antcall>
+    <copy todir="${rpmpackage.dir}/SPECS"
+          file="${scripts.dir}/install/rpm/${installer.rpm.spec.name}"/>
+    <!-- Explicitly set the rpmbuildcommand attribute for
+         physical SLES boxes -->
+    <rpm specfile="${installer.rpm.spec.name}" topdir="${rpmpackage.dir}"
+         rpmbuildcommand="rpmbuild" command="-vv -bb --target=i586"
+         failonerror="true"/>
+  </target>
+	
+  <!-- create a tar file including all upgrade artifacts -->
+  <target name="tar-iptnms-upgrade-toolkit" depends="init">
+    <tar tarfile="${dist.dir}/${upgrade.toolkit.tar}">
+      <!-- make sure including all scripts and with permision of 755 -->
+      <tarfileset filemode="755" prefix="${upgrade.scripts.dir.in.tar}" 
+        dir="${upgrade.scripts.root.dir}/${upgrade.scripts.dir.name}" 
+        includes="**/*.ksh" excludes="**/.*"/>
+      <!-- include the left file list but exclude .copyarea -->
+      <tarfileset filemode="644" prefix="${upgrade.scripts.dir.in.tar}" 
+    	dir="${upgrade.scripts.root.dir}/${upgrade.scripts.dir.name}" 
+    	includes="**/*" excludes="**/*.ksh, HP/, Linux/, **/.*"/>  
+      <!-- include the package migration scripts for R11.2 Packet upgrade -->
+      <tarfileset filemode="755" prefix="${upgrade.scripts.dir.in.tar}" 
+        dir="${scripts.dir}/tools/pg_82_migrator" 
+        includes="migrate_packet_database.ksh"/>
+    </tar>
+  </target>
+
+  <target name="assemble-deployment-archive-contents"
+          description="Create the JEE-compliant directory structure of the NSM deployment archive">
+    <fail unless="which.archive.root.dir"
+          message="Work property is not set: which.archive.root.dir"/>
+    <!-- No application server-specific files will be included in the deployment
+         archive. This means that extracting/deploying it to other locations and
+         application servers should work. For JBoss, ${which.archive.root.dir}
+         here represents $JBOSS_HOME/standalone/deployments. -->
+    <copy todir="${which.archive.root.dir}"
+          file="${dist.dir}/${project.name}.ear"/>
+    <copy todir="${which.archive.root.dir}/"
+          file="${dist.dir}/${project.name}-faultcorrelation-server.ear"/>
+    <antcall target="explode-reports">
+      <param name="which.reports.dir"
+             value="${which.archive.root.dir}/${reports.war.dir.name}"/>
+    </antcall>
+  </target>
+
+  <target name="assemble-application-server-override-contents"
+          description="Create the directory structure of NSM's application server override file archive">
+    <!-- ${which.server.home.dir} represents $JBOSS_HOME -->
+    <fail unless="which.server.home.dir"
+          message="Work property is not set: which.server.home.dir"/>
+
+    <property name="jboss.server.modules.postgresql.dir"
+              location="${which.server.home.dir}/modules/org/postgresql/main"/>
+    <property name="jboss.server.modules.jsf-api.dir"
+              location="${which.server.home.dir}/modules/javax/faces/api/main"/>
+    <property name="jboss.server.modules.jsf-impl.dir"
+              location="${which.server.home.dir}/modules/com/sun/jsf-impl/main"/>
+    <property name="jboss.server.data.dir"
+              location="${which.server.home.dir}/standalone/data/${project.name}"/>
+    <property name="jboss.server.config.dir"
+              location="${which.server.home.dir}/standalone/configuration"/>
+    <property name="jboss.server.modules.picketbox.dir"
+              location="${which.server.home.dir}/modules/org/picketbox/main"/>
+              	
+    <mkdir dir="${jboss.server.modules.postgresql.dir}"/>
+    <copy file="${lib.dir}/postgresql/postgresql/9.0-801.jdbc4/postgresql-9.0-801.jdbc4.zip"
+          todir="${jboss.server.modules.postgresql.dir}"/>
+    <copy file="${overrides.install.script.dir}/postgresql-module.xml"
+          tofile="${jboss.server.modules.postgresql.dir}/module.xml" />
+
+    <!-- TODO: Use WAR_BUNDLES_JSF_IMPL context param or
+         multi-JSF feature (https://community.jboss.org/wiki/DesignOfAS7Multi-JSFFeature) once JBoss AS upgraded.
+         Patching JBoss AS 7.1.0.Final due to https://issues.jboss.org/browse/AS7-3940.-->
+    <mkdir dir="${jboss.server.modules.jsf-api.dir}"/>
+    <copy file="${lib.dir}/com/sun/faces/jsf-api/2.1.24/jsf-api-2.1.24.jar"
+          todir="${jboss.server.modules.jsf-api.dir}"/>
+    <!-- Backing up the original file if it was not backed up before. -->
+    <move file="${jboss.server.modules.jsf-api.dir}/module.xml" overwrite="false" granularity="1000000000000"
+          tofile="${jboss.server.modules.jsf-api.dir}/module.xml.orig" failonerror="false"/>
+    <copy file="${overrides.install.script.dir}/jsf-api-module.xml"
+          tofile="${jboss.server.modules.jsf-api.dir}/module.xml"/>
+
+    <mkdir dir="${jboss.server.modules.jsf-impl.dir}"/>
+    <copy file="${lib.dir}/com/sun/faces/jsf-impl/2.1.24/jsf-impl-2.1.24.jar"
+          todir="${jboss.server.modules.jsf-impl.dir}"/>
+    <!-- Backing up the original file if it was not backed up before. -->
+    <move file="${jboss.server.modules.jsf-impl.dir}/module.xml" overwrite="false" granularity="1000000000000"
+          tofile="${jboss.server.modules.jsf-impl.dir}/module.xml.orig" failonerror="false"/>
+    <copy file="${overrides.install.script.dir}/jsf-impl-module.xml"
+          tofile="${jboss.server.modules.jsf-impl.dir}/module.xml"/>
+  	
+    <mkdir dir="${jboss.server.modules.picketbox.dir}"/>
+    <copy file="${dist.dir}/${security.customize.login.jar.name}"
+          todir="${jboss.server.modules.picketbox.dir}"/>
+    <copy file="${dist.dir}/${security.engine.jar.name}"
+          todir="${jboss.server.modules.picketbox.dir}"/>
+    <copy file="${overrides.install.script.dir}/picketbox-module.xml"
+          tofile="${jboss.server.modules.picketbox.dir}/module.xml"/>
+  	
+    <mkdir dir="${jboss.server.config.dir}"/>
+    <copy file="${overrides.install.script.dir}/server.keystore"
+          todir="${jboss.server.config.dir}"/>
+    <copy file="${overrides.install.script.dir}/vault.keystore"
+          todir="${jboss.server.config.dir}"/>
+    <copy file="${overrides.install.script.dir}/ENC.dat"
+          todir="${jboss.server.config.dir}"/>
+    <copy file="${overrides.install.script.dir}/Shared.dat"
+          todir="${jboss.server.config.dir}"/>
+    <copy file="${overrides.install.script.dir}/standalone-${profile}.xml"
+          tofile="${jboss.server.config.dir}/standalone-iptnms.xml"/>
+
+    <mkdir dir="${jboss.server.data.dir}"/>
+    <copy todir="${jboss.server.data.dir}">
+      <fileset dir="${resources.dir}">
+        <include name="schedule_jobs.properties"/>
+        <include name="mibs/**"/>
+      </fileset>
+    </copy>
+  </target>
+
+  <target name="createDetachTool"
+          description="Creates Detach Service tool to assist in realigning NSM Services">
+
+    <mkdir dir="${tools.dir}/detach/lib"/>
+    <jar jarfile="${tools.dir}/detach/lib/detachservice.jar">
+      <fileset dir="${model.jar.dir}" includes="**/*DetachService.class"/>
+      <fileset dir="${model.jar.dir}" includes="**/*BeanUtils.class"/>
+    </jar>
+
+    <copy todir="${tools.dir}/detach">
+        <fileset dir="${scripts.dir}" includes="detachService.ksh"/>
+    </copy>
+    <copy todir="${tools.dir}/detach/lib">
+        <fileset refid="oracle.lib"/>
+        <fileset dir="${lib.dir}">
+          <include name="org/hibernate/hibernate-core/4.0.1.Final/*.jar"/>
+          <include name="org/jboss/seam/jboss-seam/2.3.1.CR1/*.jar"/>
+        </fileset>
+    </copy>
+
+    <zip destfile="${dist.dir}/${detach.tool.name}" basedir="${tools.dir}/detach"/>
+    <delete dir="${tools.dir}" failonerror="no"/>
+  </target>
+
+  <target name="assemble-cable-wifi-client"
+          description="Assemble the NSM cable WiFi client so that it can be archived">
+    <fail unless="which.archive.root.dir"
+          message="Work property is not set: which.archive.root.dir"/>
+    <mkdir dir="${which.archive.root.dir}/lib"/>
+    <mkdir dir="${which.archive.root.dir}/data"/>
+    <mkdir dir="${which.archive.root.dir}/bin"/>
+    <mkdir dir="${which.archive.root.dir}/doc"/>
+    <copy todir="${which.archive.root.dir}/lib">
+      <fileset file="${dist.dir}/${model.jar.name}"/>
+      <fileset refid="oracle.lib"/>
+      <fileset refid="postgres.lib"/>
+      <fileset dir="${lib.dir}" includesfile="deployed-jars-ear.list"/>
+        <!-- TODO obecker: include only the jars that are needed and that
+             TODO obecker: can be distributed -->
+    </copy>
+    <copy todir="${which.archive.root.dir}/data">
+      <fileset dir="${src.cable.nbi.dir}/com/redback/nsm/webservice/test/data">
+        <include name="*.xls"/>
+        <include name="*.sql"/>
+      </fileset>
+    </copy>
+    <copy todir="${which.archive.root.dir}/bin">
+      <fileset dir="${src.cable.nbi.dir}/com/redback/nsm/webservice/test/scripts">
+        <include name="*.sh"/>
+        <include name="*.pl"/>
+      </fileset>
+    </copy>
+    <copy todir="${which.archive.root.dir}/doc">
+      <fileset dir="${src.cable.nbi.dir}/com/redback/nsm/webservice/test/doc">
+        <include name="*.doc"/>
+      </fileset>
+    </copy>
+  </target>
+
+  <target name="init-jrcompile" depends="jar-log4j-config">
+    <taskdef name="jrcompile" classname="net.sf.jasperreports.ant.JRAntCompileTask">
+      <classpath>
+        <fileset dir="${lib.dir}">
+          <include name="net/sf/jasperreports/jasperreports/3.7.6/*.jar"/>
+          <include name="commons-logging/commons-logging/1.0.4/*.jar"/>
+          <include name="commons-digester/commons-digester/2.1/*.jar"/>
+          <include name="commons-collections/commons-collections/3.2.1/*.jar"/>
+          <include name="commons-beanutils/commons-beanutils/1.6/*.jar"/>
+          <include name="org/eclipse/jdt/core/3.4.2.v_883_R34x/*.jar"/>
+          <include name="jfree/jcommon/1.0.14/*.jar"/>
+          <include name="jfree/jfreechart/1.0.12/*.jar"/>
+        </fileset>
+      </classpath>
+    </taskdef>
+  </target>
+    
+  <target name="build_reports" depends="init-jrcompile" description="Build reports">
+    <mkdir dir="${basedir}/reports/temp"/>
+    <jrcompile srcdir="${basedir}/reports"
+               destdir="${basedir}/reports"
+               tempdir="${basedir}/reports/temp"
+               keepjava="true">
+      <classpath refid="build.classpath"/>
+      <include name="**/*.jrxml"/>
+    </jrcompile>
+  </target>
+
+  <target name="build-correlation-archive" depends="init"
+          description="Build Fault Correlation EAR archive">
+    <ant dir="${basedir}" antfile="fault-cor.xml"
+         inheritall="false" target="ear"/>
+    <move
+      file="${src.correlation.dir}/build/dist/nsm-faultcorrelation-server.ear"
+      todir="${dist.dir}" failonerror="true"/>
+  </target>
+
+    <target name="clean-reports"
+            description="Clean .jasper report files">
+        <delete failonerror="no">
+            <fileset dir="${basedir}/reports">
+                <include name="**/*.jasper"/>
+            </fileset>
+        </delete>
+        <delete failonerror="no" dir="${basedir}/reports/temp"/>
+    </target>
+
+  <target name="clean-correlation"
+          description="Clean Fault Correlation component">
+    <ant dir="${basedir}" antfile="fault-cor.xml"
+         inheritall="false" target="clean"/>
+  </target>
+
+  <macrodef name="minify-javascript">
+    <attribute name="src" />
+    <attribute name="dest" />
+    <sequential>
+      <java jar="${lib.dir}/com/yahoo/platform/yui/yuicompressor/2.4.6/yuicompressor-2.4.6.jar" fork="true">
+        <arg line="-o" />
+        <arg value="@{dest}"/>
+        <arg value="@{src}"/>
+      </java>
+    </sequential>
+  </macrodef>
+
+  <target name="assemble-resources" description="Merge RichFaces and application resources into a single pack">
+    <!-- Define location for in & out directories.
+        'in' directory contains resources to be merged,
+        'out' directory holds merged resources.
+    -->
+    <property name="in.dir" value="${work.dir}/in"/>
+    <property name="out.dir" value="${work.dir}/out"/>
+
+    <!-- Create working directories. -->
+    <mkdir dir="${in.dir}"/>
+    <mkdir dir="${out.dir}"/>
+
+    <!-- Extract unpacked RichFaces resources to work folder. -->
+    <unzip dest="${in.dir}" src="${lib.dir}/org/richfaces/ui/richfaces-components-ui/4.3.3.Final/richfaces-components-ui-4.3.3.Final.jar">
+      <patternset>
+        <include name="META-INF/resources/org.richfaces/**/*.*"/>
+        <include name="META-INF/richfaces/staticResourceMapping/*.*"/>
+      </patternset>
+      <globmapper from="META-INF/resources/*" to="*"/>
+    </unzip>
+
+    <!-- Copy unpacked application resources to work folder. -->
+    <copy todir="${in.dir}">
+      <fileset dir="${basedir}/view/resources">
+        <include name="**/*.*"/>
+      </fileset>
+    </copy>
+
+    <!-- Some compression/packaging is skipped on Development stage for easier debugging. -->
+    <condition property="fullPackagingEnabled">
+      <not>
+        <equals arg1="${jsf.project.stage}" arg2="${jsf.project.stage.development}"/>
+      </not>
+    </condition>
+
+    <antcall target="generate-flatten-resource-mappings">
+      <param name="flatten.mappings.file" value="${out.dir}/WEB-INF/classes/META-INF/richfaces/flatten-resource-mappings.properties"/>
+    </antcall>
+    <antcall target="generate-packed-resource-mappings">
+      <param name="packed.mappings.file" value="${out.dir}/WEB-INF/classes/META-INF/richfaces/packed-resource-mappings.properties"/>
+    </antcall>
+
+    <!-- Copies processed resources to location from which they will be served during application runtime. -->
+    <copy todir="${war.dir}">
+      <fileset dir="${out.dir}"/>
+    </copy>
+  </target>
+
+  <target name="generate-flatten-resource-mappings" description="Generate flatten-resource-mappings.properties">
+    <fail unless="in.dir">in.dir not set</fail>
+    <fail unless="flatten.mappings.file">flatten.mappings.file not set</fail>
+    <pathconvert pathsep="${line.separator}" property="static-mappings">
+      <fileset dir="${in.dir}">
+        <include name="ericsson/**/*.js"/>
+        <include name="ericsson/**/*.css"/>
+        <include name="ericsson/**/*.ecss"/>
+        <include name="ericsson/**/*.img"/>
+        <include name="ericsson/**/*.jpg"/>
+        <include name="ericsson/**/*.jpeg"/>
+        <include name="ericsson/**/*.png"/>
+        <include name="ericsson/**/*.gif"/>
+        <include name="ericsson/**/*.svg"/>
+      </fileset>
+
+      <!-- Format is as following:
+           ericsson\:nsm.js=ericsson/common/scripts/nsm.js
+      -->
+      <chainedmapper>
+        <globmapper from="${in.dir}/*" to="*" handledirsep="true"/>
+        <filtermapper>
+          <replacestring from="\" to="/"/>
+        </filtermapper>
+        <regexpmapper from="^/*([^/]*)/(.*?)([^/]*)?$$" to="\1\\:\3=\1/\2\3"/>
+      </chainedmapper>
+    </pathconvert>
+
+    <echo file="${flatten.mappings.file}">${static-mappings}${line.separator}</echo>
+  </target>
+
+  <target name="generate-packed-resource-mappings" description="Generate packed-resource-mappings.properties">
+    <fail unless="packed.mappings.file">packed.mappings.file not set</fail>
+    <delete file="${packed.mappings.file}" failonerror="no"/>
+    <antcall target="assemble-richfaces-resources"/>
+    <antcall target="assemble-stylesheets"/>
+    <antcall target="assemble-javascripts"/>
+  </target>
+
+  <target name="assemble-richfaces-resources"
+          description="Generate mapping file for RichFaces resources">
+    <antcall target="assemble-richfaces-static-resources"/>
+    <antcall target="assemble-richfaces-stylesheets"/>
+  </target>
+
+  <target name="assemble-richfaces-static-resources"
+          description="Generate mapping file for RichFaces resources not dependent on skin"
+          if="fullPackagingEnabled">
+    <fail unless="in.dir">in.dir not set</fail>
+    <fail unless="packed.mappings.file">packed.mappings.file not set</fail>
+    <copy toFile="${packed.mappings.file}"
+          file="${in.dir}/META-INF/richfaces/staticResourceMapping/PackedCompressed.properties">
+      <filterchain>
+        <linecontains negate="true">
+          <contains value="%skin%"/>
+        </linecontains>
+      </filterchain>
+    </copy>
+  </target>
+
+  <target name="assemble-richfaces-stylesheets"
+          description="Merge RichFaces stylesheet resources into a single pack">
+    <fail unless="in.dir">in.dir not set</fail>
+    <fail unless="out.dir">out.dir not set</fail>
+    <fail unless="packed.mappings.file">packed.mappings.file not set</fail>
+    <resources id="extended.stylesheet.resources">
+      <fileset dir="${in.dir}">
+        <include name="org.richfaces/**/*.ecss"/>
+      </fileset>
+    </resources>
+
+    <concat destfile="${out.dir}/resources/pack-${release.version}.ecss" force="yes" fixlastline="yes" eol="unix" binary="false">
+      <resources refid="extended.stylesheet.resources"/>
+    </concat>
+
+    <pathconvert pathsep="${line.separator}" property="extended-stylesheet-mappings">
+      <resources refid="extended.stylesheet.resources"/>
+
+      <!-- Format is as following:
+           ericsson\:core.ecss=pack-13.0.3.ecss
+      -->
+      <chainedmapper>
+        <globmapper from="${in.dir}/*" to="*" handledirsep="true"/>
+        <filtermapper>
+          <replacestring from="\" to="/"/>
+        </filtermapper>
+        <regexpmapper from="^/*([^/]*)/(.*?)([^/]*)?$$" to="\1\\:\3=pack-${release.version}.ecss"/>
+      </chainedmapper>
+    </pathconvert>
+
+    <echo file="${packed.mappings.file}" append="true">${extended-stylesheet-mappings}${line.separator}</echo>
+  </target>
+
+  <target name="assemble-stylesheets" description="Merge css resources into a single pack">
+    <fail unless="in.dir">in.dir not set</fail>
+    <fail unless="out.dir">out.dir not set</fail>
+    <fail unless="packed.mappings.file">packed.mappings.file not set</fail>
+    <resources id="extended.stylesheet.resources">
+      <fileset dir="${in.dir}">
+        <include name="org.richfaces/**/*.ecss"/>
+      </fileset>
+    </resources>
+
+    <resources id="stylesheet.resources">
+      <!-- Union removes duplicates. -->
+      <union>
+        <fileset dir="${in.dir}">
+          <include name="ericsson/components/tree/ui.dynatree.css"/>
+        </fileset>
+        <fileset dir="${in.dir}">
+          <include name="ericsson/components/**/*.css"/>
+        </fileset>
+        <fileset dir="${in.dir}">
+          <include name="ericsson/commmon/**/*.css"/>
+        </fileset>
+        <fileset dir="${in.dir}">
+          <include name="ericsson/**/*.css"/>
+          <!-- OpenLayers uses relative paths. Excluding it from packaging. -->
+          <exclude name="ericsson/network/OpenLayers/**/*.*"/>
+        </fileset>
+      </union>
+    </resources>
+
+    <concat destfile="${out.dir}/resources/pack-${release.version}.css" force="yes" fixlastline="yes" eol="unix" binary="false">
+      <resources refid="stylesheet.resources"/>
+    </concat>
+
+    <pathconvert pathsep="${line.separator}" property="stylesheet-mappings">
+      <resources refid="stylesheet.resources"/>
+
+      <!-- Format is as following:
+           ericsson\:core.css=pack-13.0.3.css
+      -->
+      <chainedmapper>
+        <globmapper from="${in.dir}/*" to="*" handledirsep="true"/>
+        <filtermapper>
+          <replacestring from="\" to="/"/>
+        </filtermapper>
+        <regexpmapper from="^/*([^/]*)/(.*?)([^/]*)?$$" to="\1\\:\3=pack-${release.version}.css"/>
+      </chainedmapper>
+    </pathconvert>
+
+    <echo file="${packed.mappings.file}" append="true">${stylesheet-mappings}${line.separator}</echo>
+  </target>
+
+  <target name="assemble-javascripts" description="Package and compress javascript resources"
+          if="fullPackagingEnabled">
+    <fail unless="in.dir">in.dir not set</fail>
+    <fail unless="out.dir">out.dir not set</fail>
+    <fail unless="packed.mappings.file">packed.mappings.file not set</fail>
+    <resources id="javascript.resources">
+      <!-- Union removes duplicates. -->
+      <union>
+        <!-- Order of filesets is important. -->
+        <fileset dir="${in.dir}">
+          <include name="ericsson/components/table/jquery.event.drag.js"/>
+          <include name="ericsson/components/table/tinyMenu.js"/>
+          <include name="ericsson/components/table/table.js"/>
+        </fileset>
+        <fileset dir="${in.dir}">
+          <include name="ericsson/components/**/*.js"/>
+        </fileset>
+        <fileset dir="${in.dir}">
+          <include name="ericsson/common/**/*.js"/>
+          <exclude name="ericsson/common/scripts/patched-jsf.js"/>
+        </fileset>
+        <fileset dir="${in.dir}">
+          <include name="ericsson/network/OpenLayers/OpenLayers.js"/>
+        </fileset>
+        <fileset dir="${in.dir}">
+          <include name="ericsson/network/scripts/SingleFile.js"/>
+        </fileset>
+        <fileset dir="${in.dir}">
+          <include name="ericsson/network/scripts/NetOpUtils.js"/>
+        </fileset>
+        <fileset dir="${in.dir}">
+          <include name="ericsson/network/**/*.js"/>
+        </fileset>
+        <fileset dir="${in.dir}">
+          <include name="ericsson/**/*.js"/>
+          <exclude name="ericsson/common/scripts/patched-jsf.js"/>
+        </fileset>
+      </union>
+    </resources>
+
+    <concat destfile="${out.dir}/resources/pack.js" force="yes" fixlastline="yes" eol="unix" binary="false">
+      <resources refid="javascript.resources"/>
+    </concat>
+
+    <minify-javascript src="${out.dir}/resources/pack.js" dest="${out.dir}/resources/pack-min-${release.version}.js"/>
+
+    <pathconvert pathsep="${line.separator}" property="javascript-mappings">
+      <resources refid="javascript.resources"/>
+
+      <!-- Format is as following:
+           ericsson/:fix-contextmenu.js=pack-min-13.0.3.js
+      -->
+      <chainedmapper>
+        <globmapper from="${in.dir}/*" to="*" handledirsep="true"/>
+        <filtermapper>
+          <replacestring from="\" to="/"/>
+        </filtermapper>
+        <regexpmapper from="^/*([^/]*)/(.*?)([^/]*)?$$" to="\1\\:\3=pack-min-${release.version}.js"/>
+      </chainedmapper>
+    </pathconvert>
+
+    <echo file="${packed.mappings.file}" append="true">${javascript-mappings}${line.separator}</echo>
+  </target>
+
+  <target name="javascript-test" description="Run javascript unit-test using mocha-phantomjs">
+    <delete dir="${javascript.test.report.dir}"/>
+
+    <!-- prepare report file -->
+    <echo file="${javascript.test.report}" append="true">&lt;testsuites&gt;</echo>
+
+    <echo message="Execute Mocha Javascript Unit Tests..."/>
+    <apply executable="mocha-phantomjs" skipemptyfilesets="true">
+      <arg value="-R"/>
+      <arg value="xunit"/>
+      <fileset dir="${javascript.test.runners}" includes="**/*.html" excludes="sampleRunner.html"/>
+      <redirector output="${javascript.test.report}" append="true"/> 
+    </apply>
+
+    <echo file="${javascript.test.report}" append="true">&lt;/testsuites&gt;</echo>
+    <echo message="Javascript Unit Test Report: ${javascript.test.report}"/>
+    <xslt style="${javascript.test.dir}/test-summary.xsl"
+        in="${javascript.test.report}" out="${javascript.test.report.summary}"/>
+    <property file="${javascript.test.report.summary}"/>
+    <echo message="Tests run: ${javascript.tests}, Failures: ${javascript.failures}, Errors: ${javascript.errors}, Time elapsed: ${javascript.time} sec"/>
+  </target>
+</project>

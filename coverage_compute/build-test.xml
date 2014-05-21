@@ -1,0 +1,104 @@
+<?xml version="1.0"?>
+<project name="build-test" xmlns:jacoco="antlib:org.jacoco.ant">
+
+    <property name="test.src.dir" location="${basedir}/test" />
+    <property name="test.class.dir" location="${basedir}/testclass" />
+    <property name="test.report.dir" location="${basedir}/testreport"/>
+    <property name="test.coverage.file" location="${test.report.dir}/jacoco.exec"/>
+    <!--
+        Search java files containing failed test methods which were renamed to
+        'IGNOREDtestxxx()'
+    -->
+    <property name="search.string" value="IGNOREDtest" />
+    <fileset id="files.matches" dir="${test.src.dir}">
+        <include name="**/*.java"/>
+        <contains text="${search.string}" />
+    </fileset>
+    <pathconvert pathsep="&#xA;" property="files.contain.ignored.methods" refid="files.matches" setonempty="false"/>
+
+  <!-- Sonar properties -->
+  <property name="sonar.dynamicAnalysis" value="reuseReports"/>
+  <property name="sonar.surefire.reportsPath" value="${test.report.dir}"/>
+  <property name="sonar.core.codeCoveragePlugin" value="jacoco"/>
+  <property name="sonar.jacoco.reportPath" value="${test.coverage.file}"/>
+
+  <taskdef resource="org/jacoco/ant/antlib.xml" uri="antlib:org.jacoco.ant">
+    <classpath path="${lib.dir}/org/jacoco/org.jacoco.ant/0.5.8.201207111220/jacocoant.jar"/>
+  </taskdef>
+
+    <target name="compile-test">
+        <mkdir dir="${test.class.dir}" />
+        <mkdir dir="${test.report.dir}" />
+        <!--
+            Some test source code (in cccserver project) can not be compiled,
+            they are excluded to compile at the moment
+        -->
+        <javac srcdir="${test.src.dir}" destdir="${test.class.dir}"
+            excludes="${test.src.excludes}" classpathref="test.classpath" debug="true"
+            debuglevel="lines,vars,source" source="1.5" target="1.5" optimize="false">
+            <exclude name="${test.src.excludes1}" />
+        </javac>
+    </target>
+
+    <target name="junit-test" depends="compile-test">
+        <fail unless="test.class.dir" message="test.class.dir not set" />
+        <fail unless="test.classpath" message="test.classpath not set" />
+        <fail unless="test.report.dir" message="test.report.dir not set" />
+        <fail unless="test.classname" message="test.classname not set"/>
+        <echo
+            message="Junit report of ${test.classname} will be written to ${test.report.dir}" />
+
+      <delete file="${test.coverage.file}"/>
+
+      <jacoco:coverage destfile="${test.coverage.file}">
+        <junit printsummary="on" fork="yes">
+            <jvmarg value="-ea" />
+            <jvmarg value="-Dneaccess.junit.ignore.msg.send.delay=true" />
+            <jvmarg value="-XX:MaxPermSize=256m" />
+            <jvmarg value="-XX:-UseSplitVerifier"/>
+            <classpath>
+                <pathelement location="${test.class.dir}" />
+                <path refid="test.classpath" />
+            </classpath>
+            <test name="${test.classname}" todir="${test.report.dir}">
+                <formatter type="brief" />
+                <formatter type="xml"/>
+            </test>
+        </junit>
+      </jacoco:coverage>
+      <antcall target="generate-coverage-report"/>
+    </target>
+
+  <target name="generate-coverage-report">
+    <available property="test.coverage.file.exists" file="${test.coverage.file}"/>
+    <fail unless="test.coverage.file.exists" message="${test.coverage.file} does not exist"/>
+
+    <jacoco:report>
+      <executiondata>
+        <file file="${test.coverage.file}"/>
+      </executiondata>
+      <structure name="${module.name}">
+        <classfiles>
+          <fileset dir="${class.dir}"/>
+        </classfiles>
+        <sourcefiles>
+          <fileset dir="${src.dir}"/>
+        </sourcefiles>
+      </structure>
+      <html destdir="${test.report.dir}/coverage"/>
+    </jacoco:report>
+  </target>
+
+    <target name="clean-test">
+        <delete dir="${test.class.dir}" failonerror="no" />
+        <delete dir="${test.report.dir}" failonerror="no" />
+    </target>
+
+    <!-- Print files containing excluded test methods -->
+    <target name="list-ignored-tests" if="files.contain.ignored.methods">
+        <echo message="Some test methods that have been broken previously now have the 'IGNORED' prefix, and have been excluded from current junit test suites."/>
+        <echo message="Please check the file ${test.report.dir}/files_contain_ignored_methods.txt to locate files containing excluded test methods."/>
+        <echo file="${test.report.dir}/files_contain_ignored_methods.txt">${files.contain.ignored.methods}</echo>
+    </target>
+
+</project>

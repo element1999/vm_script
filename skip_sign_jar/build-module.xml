@@ -1,0 +1,97 @@
+<?xml version="1.0"?>
+<project name="build-module">
+
+  <dirname property="modules.dir" file="${ant.file.build-module}"/>
+  <basename property="module.name" file="${basedir}"/>
+  <property name="root.dir" location="${modules.dir}/../.."/>
+  
+  <property file="${modules.dir}/build.properties"/>
+  
+  <property name="src.dir" location="${basedir}/src"/>
+  <property name="class.dir" location="${basedir}/class"/>
+  <property name="jar.dir" location="${basedir}/jar"/>
+  <property name="jar.file.name" value="${module.name}.jar"/>
+  <property name="jar.file" location="${jar.dir}/${jar.file.name}"/>
+  <property name="pmd.report.txt.file" location="${basedir}/pmd-report.txt"/>
+
+  <property name="javac.debug" value="true"/>
+  <property name="javac.deprecation" value="true"/>
+  <property name="javac.source" value="1.6"/>
+
+  <!-- Sonar properties -->
+  <property file="${modules.dir}/sonar.properties"/>
+  <property name="sonar.projectKey" value="com.ericsson.iptnms:packet-${module.name}:${branch}"/>
+  <property name="sonar.projectVersion" value="${branch}"/>
+  <property name="sonar.sources" value="${src.dir}"/>
+  <property name="sonar.binaries" value="${class.dir}"/>
+  
+  <!-- TODO: share with top-level build -->
+  <property name="keystore.file" location="${modules.dir}/.keystore"/>
+  <property name="keystore.alias" value="IPT-NMS-Packet"/>
+  <property name="keystore.pass" value="ericsson"/>
+
+  <target name="setup">
+    <!-- can be overridden by module to perform pre-compile setup -->
+  </target>
+
+  <target name="compile" depends="setup">
+    <mkdir dir="${class.dir}"/>
+    <javac srcdir="${src.dir}" destdir="${class.dir}" excludes="${src.excludes}"
+           debug="${javac.debug}" deprecation="${javac.deprecation}"
+           source="${javac.source}" classpathref="javac.classpath"/>
+  </target>
+
+  <target name="jar">
+    <mkdir dir="${jar.dir}"/>
+    <jar destfile="${jar.file}" basedir="${class.dir}" includes="**/*.class"/>
+  </target>
+
+  <target name="clean">
+    <delete dir="${class.dir}"/>
+    <delete dir="${jar.dir}"/>
+    <delete dir=".sonar"/>
+    <delete file="${pmd.report.txt.file}"/>
+  </target>
+
+  <target name="deploy">
+    <fail unless="esa.home"/>
+    <copy todir="${esa.home}/lib" file="${jar.file}"/>
+    <antcall target="signjar">
+      <param name="signed.jar.file" value="${esa.home}/lib/${jar.file.name}"/>
+    </antcall>
+  </target>
+  
+  <target name="signjar" unless="skip.signjar">
+    <fail unless="keystore.alias"/>
+    <fail unless="keystore.pass"/>
+    <fail unless="keystore.file"/>
+    <fail unless="signed.jar.file"/>
+    <available property="keystore.available" file="${keystore.file}"/>
+    <available property="signed.jar.available" file="${signed.jar.file}"/>
+    <fail unless="keystore.available"/>
+    <fail unless="signed.jar.available"/>
+    
+    <signjar alias="${keystore.alias}" storepass="${keystore.pass}"
+             keypass="${keystore.pass}" keystore="${keystore.file}"
+             jar="${signed.jar.file}"/>
+  </target>
+
+  <target name="pmd">
+    <taskdef name="pmd" classname="net.sourceforge.pmd.ant.PMDTask">
+      <classpath>
+        <fileset dir="${lib.dir}">
+          <include name="pmd/pmd/4.3/*.jar"/>
+          <include name="asm/asm/3.2/*.jar"/>
+          <include name="jaxen/jaxen/1.1.1/*.jar"/>
+        </fileset>
+      </classpath>
+    </taskdef>
+
+    <pmd shortfilenames="true" targetjdk="1.6">
+      <ruleset>${modules.dir}/pmd-config.xml</ruleset>
+      <formatter type="text" tofile="${pmd.report.txt.file}"/>
+      <fileset dir="${src.dir}" includes="**/*.java"/>
+    </pmd>
+  </target>
+
+</project>
