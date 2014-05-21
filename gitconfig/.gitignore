@@ -1,0 +1,8 @@
+*.iml
+*.swp
+.idea
+.spec
+*.orig
+RPMS/
+SOURCES/
+*.bak

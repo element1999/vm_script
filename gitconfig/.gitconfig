@@ -1,0 +1,23 @@
+[user]
+	name = ehuudog
+	email = dongdong.hu@ericsson.com
+[core]
+	autocrlf = input
+	excludesfile = /root/.gitignore
+[color]
+	ui = true
+[gui]
+	encoding = utf-8
+[push]
+	default = tracking
+[alias]
+	s = status
+	co =checkout
+	ci  = commit
+	last = log -l HEAD
+	b =branch	
+	
+[merge]
+	tool = diff3
+[diff]
+	tool = kdiff3
